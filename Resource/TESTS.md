@@ -30,6 +30,18 @@ Final cloud build and Worker types passed; **7/7 Worker integration tests** pass
 
 The final Pages build, its security-header integration test, format/lint/frontend/service/Worker type checks, documentation links and diff-whitespace check all passed before publication. Public relay checks require the deployed Worker secrets and are recorded after deployment.
 
+## Published protocol-v2 update
+
+Commit 99cc86c was pushed to main and deployed by [GitHub Actions run 42424098488](https://github.com/kkaushik14/file2file/actions/runs/42424098488). The first CI attempt passed 33/34 browser cases but timed out on Linux WebKit → Chromium. An unchanged rerun passed the complete verification and both deployments; the cause of that single timeout is not established and the failure is retained here. No cases were skipped, and no app timeout was relaxed. Node.js 26.13.0 remains pinned.
+
+The deployed custom frontend, all information pages, security.txt and relay-enabled Worker health passed the live endpoint check. Actual UDP-only public ExpressTURN tests passed **4/4** in 1.6 minutes: Chromium, WebKit and both cross-engine directions, each with a 1 MiB+17-byte download and matching SHA-256. Native selected candidates were relays; Chromium confirmed UDP and both engines used only UDP TURN URLs. Test-case durations including setup were 17.9–29.1 seconds, far slower than the local direct path. Do not promise fast multi-GiB relaying from this evidence.
+
+The initial UDP run passed both WebKit-led cases; Chromium-led cases reached 80% and 66% before the old 30-second assertion deadline. The hosted forced-relay harness now allows 120 seconds for active completion and 180 seconds per case. The app's independent 30-second inactivity limit remains unchanged. The complete rerun passed; the higher test deadline does not bypass file integrity or native relay-route checks.
+
+TCP-only public relay verification also passed **4/4** in 1.7 minutes, with the same downloaded-hash and native relay-pair checks. Case durations including setup were 14.5–30.0 seconds. UDP and TCP use port 3478; no free TLS/443 capability is claimed. All tests ran from one computer/network against the actual public relay, not two independent physical networks. No multi-GiB test consumed provider quota. The actual relay secrets were entered by the owner directly in Cloudflare and never copied into the repository or logs.
+
+Post-deploy signaling verification passed five public functional/security cases and the separate local synthetic-credential case. The socket-saturation case was intentionally skipped on the live service and had passed locally. Published information-page/navigation/contact/mobile-reflow checks passed **2/2** in Chromium and WebKit (7.2 seconds), including no page errors. The follow-up evidence/test-harness-only commit uses [skip ci] because it does not alter deployed application assets or Worker code; later ordinary main pushes still verify and deploy automatically.
+
 ## Earlier milestone evidence
 
 The sections below record earlier builds in order, including their failures and limitations. Their 50 MiB cap and unresolved hosted WebKit status are historical; use the current protocol-v2 results above and final results below for this update.

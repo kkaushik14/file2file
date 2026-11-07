@@ -1,6 +1,6 @@
 # Free hosted test preview
 
-Updated: 2026-11-08. The owner requires a zero budget. This is an experimental preview, not a production release or verified cross-network relay service.
+Updated: 2026-11-08. The owner requires a zero budget. This is an experimental preview. Public relay routing is verified below; production readiness and the physical-device/independent-network matrix remain open.
 
 ## Endpoints and cost boundary
 
@@ -97,3 +97,7 @@ Use **Node.js 26.x**, currently pinned to **26.13.0** in .nvmrc, with npm 11.20.
 A deploy interrupts existing in-memory sessions. If one target fails after the other succeeds, check the Actions log, fix the failure and rerun; do not report success until both targets and the public endpoint check pass. The workflow is not an atomic cross-service release. Hosted discovery now includes fresh IPv4 fallback for WebKit; the CI WebRTC suite still uses local STUN, so provider-route checks remain separate from CI.
 
 The first automatic deployment succeeded for fc474c9 in [run 42416571115](https://github.com/kkaushik14/file2file/actions/runs/42416571115), including both targets and the public endpoint checks. The post-deploy Chromium 1 MiB + 17-byte transfer and information-page checks also pass. See [verification evidence](TESTS.md).
+
+## Protocol-v2 deployment and relay verification
+
+Commit 99cc86c was deployed by [run 42424098488](https://github.com/kkaushik14/file2file/actions/runs/42424098488) after successful verification on its second attempt. The first attempt had one Linux WebKit-to-Chromium timeout, retained in TESTS. Both Cloudflare deployments and the public endpoint check passed. ExpressTURN Free credentials are installed as Worker secrets; health reports turn/true. Real forced-relay UDP and TCP suites each passed four cases on share.kkos.in, covering both engines and both directions with matching downloaded SHA-256. These tests prove public relay use from this machine, not the separate-device/network matrix. Free relay timings were much slower than direct local benchmarks; quota is not a speed guarantee. Both tabs must refresh and use new v2 links after deployment.

@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,
-  timeout: 60_000,
+  timeout: process.env.CLOUD_TEST_FORCE_RELAY === '1' ? 180_000 : 60_000,
   use: { baseURL, trace: 'off', screenshot: 'only-on-failure' },
   webServer: process.env.CLOUD_TEST_URL
     ? undefined

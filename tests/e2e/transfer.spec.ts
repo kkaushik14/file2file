@@ -7,6 +7,10 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { observeRelay, expectRelay } from './relay-evidence';
 
+// Public free relays can be much slower than loopback. Keep the app's own
+// 30-second inactivity deadline while allowing an actively progressing test.
+const transferTimeout = process.env.CLOUD_TEST_FORCE_RELAY === '1' ? 120_000 : 30_000;
+
 async function chooseFile(page: Page, name: string, bytes: Buffer) {
   const path = test.info().outputPath(name);
   await mkdir(dirname(path), { recursive: true });
@@ -47,7 +51,7 @@ for (const size of [0, 1024 * 1024 + 17, 50 * 1024 * 1024]) {
     await receiver.getByLabel('Transfer PIN').fill('123456');
     await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
     await expect(receiver.getByRole('link', { name: 'Save file' })).toBeVisible({
-      timeout: 30_000,
+      timeout: transferTimeout,
     });
     const pending = receiver.waitForEvent('download');
     await receiver.getByRole('link', { name: 'Save file' }).click();
@@ -95,7 +99,7 @@ test('encrypted transfer to the other browser engine', async ({ page, browserNam
     await receiver.getByLabel('Transfer PIN').fill('123456');
     await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
     await expect(receiver.getByRole('link', { name: 'Save file' })).toBeVisible({
-      timeout: 30_000,
+      timeout: transferTimeout,
     });
     const pending = receiver.waitForEvent('download');
     await receiver.getByRole('link', { name: 'Save file' }).click();

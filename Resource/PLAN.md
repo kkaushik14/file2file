@@ -1,15 +1,15 @@
 # Implementation progress
 
-Updated: 2026-11-08. The security/navigation and automatic-deployment milestones are live. The current follow-up implements 8 GiB transfers, protocol v2 receive credits, public WebKit discovery fallback, and ExpressTURN Free. Final local verification passed 34 browser cases, 26 unit/service cases and separate full 8 GiB download-hash benchmarks in both engines. Hosted checks, deployment and live provider verification follow below.
+Updated: 2026-11-08. The security/navigation and automatic-deployment milestones are live. The current follow-up implements 8 GiB transfers, protocol v2 receive credits, public WebKit discovery fallback, and ExpressTURN Free. Final local verification passed 34 browser cases, 26 unit/service cases and separate full 8 GiB download-hash benchmarks in both engines. Both Cloudflare targets deployed successfully, and public forced-relay UDP/TCP tests passed in both engines and both cross-engine directions. Physical-device/network acceptance remains open.
 
-| Phase                   | Status               | Evidence / next gate                                                                                                                      |
-| ----------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| P0 design               | Complete for preview | Explicit PIN/trust limits, bounded flow control, browser-managed Blob backing, 15-minute join and 60-minute active deadlines              |
-| P1 foundation           | Complete             | Portfolio conventions, named features, static Next export, separate Worker/Node services, Node 26.13.0                                    |
-| P2 single-file slice    | Working              | Encryption, download integrity, cancellation; 8 GiB passed in Chromium/WebKit normal receiver profiles                                    |
-| P3 reliability          | In verification      | Public DNS fallback and free relay configured; final regression/live relay checks below; physical devices and independent networks remain |
-| P4 larger product scope | Deferred             | Disk streaming, resume, folders and multiple receivers need separate design and evidence                                                  |
-| P5 public release       | Preview only         | Independent security review, operations, physical-device/network and sustained resource tests remain                                      |
+| Phase                   | Status                          | Evidence / next gate                                                                                                         |
+| ----------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| P0 design               | Complete for preview            | Explicit PIN/trust limits, bounded flow control, browser-managed Blob backing, 15-minute join and 60-minute active deadlines |
+| P1 foundation           | Complete                        | Portfolio conventions, named features, static Next export, separate Worker/Node services, Node 26.13.0                       |
+| P2 single-file slice    | Working                         | Encryption, download integrity, cancellation; 8 GiB passed in Chromium/WebKit normal receiver profiles                       |
+| P3 reliability          | Implemented; device checks open | Hosted WebKit and public UDP/TCP relay checks pass; physical devices and independent networks remain                         |
+| P4 larger product scope | Deferred                        | Disk streaming, resume, folders and multiple receivers need separate design and evidence                                     |
+| P5 public release       | Preview only                    | Independent security review, operations, physical-device/network and sustained resource tests remain                         |
 
 ## Current follow-up
 
@@ -17,12 +17,12 @@ Updated: 2026-11-08. The security/navigation and automatic-deployment milestones
 - The cap increased from 50 MiB to 8 GiB after real transfer/download hashes passed in both engines. Full-file browser backing storage is still required. Private profiles and phones can have lower practical limits; 4 GiB private-profile Chromium download failed while normal profiles passed.
 - The owner approved a 60-minute active deadline starting at receiver admission. Unused links remain 15 minutes and stalled connections stop after 30 seconds. This does not slow fast transfers.
 - Hosted discovery retains provider hostnames and adds fresh validated public IPv4 addresses from bounded DNS-over-HTTPS. It fixes the observed WebKit hostname-discovery failure without changing browser privacy settings.
-- The owner created ExpressTURN Free (1000 GB/month, UDP/TCP 3478), approved relay-secret use, and entered the actual relay values directly in Cloudflare. No card, Premium plan or billable subscription was enabled. Live relay checks must succeed before claiming the provider works.
+- The owner created ExpressTURN Free (1000 GB/month, UDP/TCP 3478), approved relay-secret use, and entered the actual relay values directly in Cloudflare. No card, Premium plan or billable subscription was enabled. Live forced-relay UDP and TCP checks subsequently passed in both engines and cross-engine directions.
 - CI uses 512 MiB for the large-file regression to bound runner disk use. Full 8 GiB benchmarks run separately on direct/local paths, never consuming free relay quota.
 
 ## Remaining acceptance
 
-1. Complete final local/cloud checks and live forced-relay UDP/TCP tests after push-triggered deployment.
+1. Monitor the Free provider and repeat the real relay checks after credential/provider changes. The free relay is functional but much slower than local direct transfers; no fast multi-GiB relay guarantee is made.
 2. Test physical Safari/iOS/Android and Wi-Fi-to-cellular transfers in both directions. Free TURN has no TLS/443 fallback for networks blocking 3478.
 3. Profile mobile memory/KDF behavior; review static relay-credential abuse and shared quota operations before production release.
 
@@ -79,3 +79,7 @@ Implemented the source-review fixes, public information routes, contact mailbox,
 Commit fc474c9 was pushed to main in the owner-confirmed repository. [GitHub Actions run 42416571115](https://github.com/kkaushik14/file2file/actions/runs/42416571115) passed verification and deployed both Cloudflare targets in 3 minutes 5 seconds under Node.js 26.13.0. The public endpoint check passed. Future successful main pushes follow this workflow; no paid service was activated.
 
 The live Worker passed five functional/security integration cases; the connection-cap saturation test is intentionally local-only. On https://share.kkos.in, both targeted Chromium E2E cases passed: all information pages/navigation/contact targets at 320px in both themes, and an actual 1,048,593-byte transfer with matching SHA-256. The browser visually verified the published sender/contact page and owner-confirmed email. Hosted WebKit, physical devices and separate networks remain open.
+
+## Published larger-file and free-relay milestone
+
+Application commit 99cc86c deployed through [run 42424098488](https://github.com/kkaushik14/file2file/actions/runs/42424098488). An unchanged rerun passed after one Linux cross-engine timeout in the first attempt; its cause remains unestablished and is recorded in TESTS. Final local 8 GiB verified-receipt times were 202.100 seconds in Chromium and 253.954 seconds in WebKit; full saved-download hashes matched at 252.067 and 301.588 seconds. Both used normal desktop receiver profiles. The public ExpressTURN UDP and TCP suites each passed all four cases. Refresh both tabs and create fresh protocol-v2 links. The remaining acceptance work is physical Safari/iOS/Android, independent networks, mobile/storage profiling and production operations.
