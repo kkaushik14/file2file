@@ -1,8 +1,9 @@
-import { object, SESSION_TTL_MS } from './transfer';
+import { object, ACTIVE_TRANSFER_TTL_MS } from './transfer';
 
 export type IceServer = { urls: string[]; username?: string; credential?: string };
 export type IceConfiguration = {
   mode: 'local' | 'stun' | 'turn';
+  credentialMode?: 'static';
   iceTransportPolicy: 'all' | 'relay';
   iceServers: IceServer[];
   expiresAt: number;
@@ -24,10 +25,12 @@ export function parseIceConfiguration(value: unknown, now = Date.now()): IceConf
   const config = object(value);
   if (
     !['local', 'stun', 'turn'].includes(config.mode as string) ||
+    (config.credentialMode !== undefined &&
+      (config.credentialMode !== 'static' || config.mode !== 'turn')) ||
     (config.iceTransportPolicy !== 'all' && config.iceTransportPolicy !== 'relay') ||
     !Number.isSafeInteger(config.expiresAt) ||
     (config.expiresAt as number) <= now ||
-    (config.expiresAt as number) > now + SESSION_TTL_MS + 61_000 ||
+    (config.expiresAt as number) > now + ACTIVE_TRANSFER_TTL_MS + 61_000 ||
     !Array.isArray(config.iceServers) ||
     config.iceServers.length < 1 ||
     config.iceServers.length > 2
@@ -47,7 +50,15 @@ export function parseIceConfiguration(value: unknown, now = Date.now()): IceConf
       throw new Error('Invalid connection server URL.');
     if (turn) {
       hasTurn = true;
-      if (
+      if (config.credentialMode === 'static') {
+        if (
+          typeof server.username !== 'string' ||
+          !/^[\x21-\x7e]{1,256}$/.test(server.username) ||
+          typeof server.credential !== 'string' ||
+          !/^[\x21-\x7e]{1,256}$/.test(server.credential)
+        )
+          throw new Error('Invalid provider relay credentials.');
+      } else if (
         typeof server.username !== 'string' ||
         !/^\d{10,12}:[A-Za-z0-9_-]{22}$/.test(server.username) ||
         typeof server.credential !== 'string' ||
@@ -74,6 +85,7 @@ export function parseIceConfiguration(value: unknown, now = Date.now()): IceConf
     throw new Error('Incomplete connection configuration.');
   return {
     mode: config.mode as IceConfiguration['mode'],
+    ...(config.credentialMode === 'static' ? { credentialMode: 'static' as const } : {}),
     iceTransportPolicy: config.iceTransportPolicy as IceConfiguration['iceTransportPolicy'],
     expiresAt: config.expiresAt as number,
     iceServers,

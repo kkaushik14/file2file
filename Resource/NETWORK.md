@@ -1,6 +1,6 @@
 # STUN/TURN configuration and verification
 
-The project originally selected coturn in its implementation guide. Repository inspection found no deployed TURN hostname, provider account, credentials file, or public signaling endpoint. The implementation therefore uses coturn's temporary-credential mechanism and preserves the existing local default. The free Cloudflare preview supplies HTTPS/WSS and public STUN; no public TURN service is configured. See [cloud setup](CLOUD.md) for the zero-budget decision and test limitations.
+The project originally selected coturn in its implementation guide. Repository inspection found no deployed TURN hostname, provider account, credentials file, or public signaling endpoint. The implementation therefore uses coturn's temporary-credential mechanism and preserves the existing local default. The free Cloudflare preview supplies HTTPS/WSS, public STUN with a WebKit DNS fallback, and owner-approved ExpressTURN Free configuration described below. See [cloud setup](CLOUD.md) for the zero-budget decision and test limitations.
 
 ## Application configuration
 
@@ -30,7 +30,7 @@ openssl rand -base64 32 > /private/service/path/turn-secret
 
 Signaling sends each peer validated ICE configuration only when a receiver is admitted: `joined` for the receiver, `paired` for the sender. Session creation, wrong admission, a second receiver, and arbitrary credential requests do not issue credentials. The receiver still unlocks the PIN locally before joining. Each peer gets a distinct random username suffix, an expiry timestamp and a coturn HMAC-SHA1/base64 password. HMAC-SHA1 here is coturn REST authentication compatibility, not the file encryption algorithm. AES-GCM file encryption is unchanged.
 
-Credential expiry is the original session expiry rounded up to seconds plus 60 seconds of clock-skew allowance: at most roughly 16 minutes from creation. Credentials are generated at pairing, never refreshed, and kept only by the peer connection. Synchronize signaling and TURN clocks. Cancelling removes the app session but cannot instantly revoke a copied TURN credential or an existing allocation; coturn allocation lifetimes, quotas, bandwidth limits and network policies remain necessary. Anonymous users can create their own sender/receiver pair: admission is not account authentication or a billing-abuse solution. Apply edge rate limits and monitor relay usage before public access. The service ignores forwarded IP headers; behind a proxy its existing creation budget is shared by that proxy address unless a reviewed edge policy is added.
+Coturn credential expiry is the admitted active-transfer deadline rounded up to seconds plus 60 seconds of clock-skew allowance: at most roughly 61 minutes from admission. Credentials are generated at pairing, never refreshed, and kept only by the peer connection. Synchronize signaling and TURN clocks. Cancelling removes the app session but cannot instantly revoke a copied TURN credential or an existing allocation; coturn allocation lifetimes, quotas, bandwidth limits and network policies remain necessary. Anonymous users can create their own sender/receiver pair: admission is not account authentication or a billing-abuse solution. Apply edge rate limits and monitor relay usage before public access. The service ignores forwarded IP headers; behind a proxy its existing creation budget is shared by that proxy address unless a reviewed edge policy is added.
 
 ## Host setup
 
@@ -67,6 +67,29 @@ Local relay tests do not prove public DNS, TLS, NAT mapping, firewall rules or m
 3. Transfer synthetic empty, 1 MiB + 17-byte and 50 MiB files; compare size and SHA-256 on download. Repeat both send/receive directions on physical Safari/iOS and Chromium/Android. Check cancellation and expiry.
 4. Confirm invalid/expired credentials cannot allocate a relay; a relay outage in forced-relay mode must fail without a Save action. Then restore all intended endpoints and policy `all`, test direct and relay selection, and record host, engine/device, network, selected transport, duration and result without secrets.
 
-Until that evidence exists, describe cross-network support as configured in code and locally verified, not publicly operational.
+Distinguish actual public relay verification from the still-required physical-device and independent-network matrix.
 
 Sources: [coturn server documentation](https://github.com/coturn/coturn/blob/master/README.turnserver) defines REST credentials and relay options; [coturn reference configuration](https://github.com/coturn/coturn/blob/master/examples/etc/turnserver.conf) explains TLS, public/private mappings, ports and quotas; [WebRTC specification](https://www.w3.org/TR/webrtc/) defines ICE policies and peer configuration.
+
+## Zero-budget hosted relay: ExpressTURN Free
+
+On 2026-11-08 the owner created an ExpressTURN account and its dashboard confirmed **Free mode**, **1000 GB/month**, and **UDP/TCP port 3478**. The owner then approved putting the relay credentials in the existing Cloudflare Worker. No Premium plan, subscription or payment details were added. [Provider plan and FAQ](https://www.expressturn.com/), [terms](https://www.expressturn.com/terms), [privacy](https://www.expressturn.com/privacy).
+
+Use the fixed `free.expressturn.com:3478` endpoint. Free does not include TURN TLS/443, shared-secret authentication, paid-account usage reporting or a reliability commitment. Networks blocking 3478 can still fail. The published allowance is a provider limit, not a per-file guarantee or a verified exact quota cutoff test. Free credentials can be suspended or rotated; do not upgrade to bypass quota limits.
+
+`TURN_USERNAME` and `TURN_PASSWORD` are secrets in file2file-preview, never NEXT_PUBLIC variables, Pages build settings or repository files. Wrangler deploy preserves these existing Worker secrets. The app prefers direct connections; an encrypted public relay is available when ICE requires it. The health response reports configured mode, not a fresh relay-availability test. Missing both secrets means STUN only; a partial configuration fails closed. The existing Node/coturn short-lived credential path is preserved.
+
+The browser must receive the reusable provider credentials after admission. They are not confidential from admitted users and do not expire with the app session. Anyone who extracts them can consume shared quota outside File2File. Rotate through the provider dashboard and replace both Worker secrets if abused. Do not claim per-session revocation. Cloudflare DNS-over-HTTPS supplies fresh public IPv4 fallback URLs for WebKit while retaining original hostnames. Provider credentials, IP candidates and file/link contents must not be logged.
+
+For real relay verification against the deployed app, no secret export is needed:
+
+```sh
+CLOUD_TEST_URL=https://share.kkos.in npm run test:e2e:hosted-turn -- udp
+CLOUD_TEST_URL=https://share.kkos.in npm run test:e2e:hosted-turn -- tcp
+```
+
+Tests narrow the app-issued ICE configuration to one real transport and relay-only policy, verify native selected relay candidate pairs, and download the encrypted file with matching SHA-256. Normal app policy remains all. Never spend provider quota on multi-GiB benchmarks; run those on direct/local paths.
+
+For a disposable local Worker, build with `npm run build:cloud` and point TURN_TEST_SECRETS_FILE at a mode-0600 JSON file outside the repository containing only TURN_USERNAME and TURN_PASSWORD. The same harness uses those values locally and stops the runtime afterward. Delete the private file after testing. Masked `<redacted>` values are explicitly rejected; enter secrets directly in the provider UI when tools cannot access them. Never bypass credential redaction or paste secrets into chat.
+
+Finish acceptance on two independent devices/networks (for example Wi-Fi and mobile data), including physical Safari/iOS. A forced public relay test from this computer proves the relay path but does not replace that device/network matrix.

@@ -25,5 +25,5 @@ for (const path of [
 }
 const response = await fetch(signalingOrigin + '/health', { signal: AbortSignal.timeout(20_000) });
 assert.equal(response.status, 200);
-assert.deepEqual(await response.json(), { ok: true, network: 'stun', relay: false });
-console.log('Verified STUN-only signaling health.');
+assert.deepEqual(await response.json(), { ok: true, network: 'turn', relay: true });
+console.log('Verified signaling health with relay configuration enabled.');

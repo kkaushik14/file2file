@@ -44,7 +44,8 @@
     "test:cloud": "node --test workers/file-sharing/tests/*.test.mjs",
     "test:e2e:cloud": "playwright test --config playwright.cloud.config.ts",
     "build:pages": "node scripts/build-cloud.mjs --pages",
-    "test:pages": "node --test tests/hosting/*.test.mjs"
+    "test:pages": "node --test tests/hosting/*.test.mjs",
+    "test:e2e:hosted-turn": "node scripts/test-hosted-turn.mjs"
   },
   "dependencies": {
     "next": "16.4.5",

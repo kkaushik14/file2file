@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import type { LinkEnvelope } from '@/contracts/transfer';
 import { ActionButton } from '@/components/ui/ActionButton/ActionButton';
@@ -26,6 +26,24 @@ export function ReceiverView() {
   const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expiryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const scheduleExpiry = useCallback((expiresAt: number) => {
+    if (expiryTimer.current) clearTimeout(expiryTimer.current);
+    expiryTimer.current = setTimeout(() => {
+      generation.current += 1;
+      session.current?.close();
+      envelope.current = null;
+      initialFragment.current = null;
+      if (blobUrl.current) URL.revokeObjectURL(blobUrl.current);
+      blobUrl.current = null;
+      setDownload(null);
+      setPin('');
+      setAvailable(false);
+      setBusy(false);
+      setProgress(null);
+      setError('This transfer has expired. Ask the sender for a new link.');
+    }, expiresAt - Date.now());
+  }, []);
+
   useEffect(() => {
     // Link secrets are read and removed only in the browser, never during static rendering.
     initialFragment.current ??= location.hash;
@@ -36,20 +54,7 @@ export function ReceiverView() {
         const parsed = parseLink(fragment);
         envelope.current = parsed;
         setAvailable(true);
-        expiryTimer.current = setTimeout(() => {
-          generation.current += 1;
-          session.current?.close();
-          envelope.current = null;
-          initialFragment.current = null;
-          if (blobUrl.current) URL.revokeObjectURL(blobUrl.current);
-          blobUrl.current = null;
-          setDownload(null);
-          setPin('');
-          setAvailable(false);
-          setBusy(false);
-          setProgress(null);
-          setError('This transfer has expired. Ask the sender for a new link.');
-        }, parsed.expiresAt - Date.now());
+        scheduleExpiry(parsed.expiresAt);
       } catch {
         setError('This link is missing, invalid, or expired. Ask the sender for a new link.');
       }
@@ -81,7 +86,7 @@ export function ReceiverView() {
       dispose();
       window.removeEventListener('pagehide', leave);
     };
-  }, []);
+  }, [scheduleExpiry]);
 
   function cancel() {
     generation.current += 1;
@@ -137,6 +142,9 @@ export function ReceiverView() {
     }
     setPin('');
     const controller = new TransferSession({
+      expiry: (expiresAt) => {
+        if (generation.current === operation) scheduleExpiry(expiresAt);
+      },
       progress: (value) => {
         if (generation.current === operation) setProgress(value);
       },
@@ -240,7 +248,11 @@ export function ReceiverView() {
             {error}
           </p>
         )}
-        {!available && !download && <Link href="/">Send a file instead</Link>}
+        {!available && !download && (
+          <Link href="/" prefetch={false}>
+            Send a file instead
+          </Link>
+        )}
       </div>
       <p className={styles.help}>
         By using File2File, you agree to the <a href="/terms/">Terms of Use</a>. Read our{' '}

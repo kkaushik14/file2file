@@ -44,7 +44,7 @@ test('information pages have complete navigation, working contact links and mobi
     .click();
   await page.getByText('The connection stalls or never starts', { exact: true }).click();
   await expect(
-    page.getByText('There is no guaranteed cross-network fallback yet.', { exact: false }),
+    page.getByText('the free plan has no TLS relay on port 443.', { exact: false }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

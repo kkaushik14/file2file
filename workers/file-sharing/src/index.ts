@@ -1,8 +1,9 @@
+import { relayEnabled, type RelayEnvironment } from './ice';
 import hashes from '../generated/csp.json';
 import { allowsOrigin } from './origin';
 export { SignalingHub } from './signaling';
 
-type Environment = { ASSETS: Fetcher; SIGNALING: DurableObjectNamespace };
+type Environment = RelayEnvironment & { ASSETS: Fetcher; SIGNALING: DurableObjectNamespace };
 
 export default {
   async fetch(request: Request, env: Environment): Promise<Response> {
@@ -27,13 +28,23 @@ export default {
     }
     if (!['GET', 'HEAD'].includes(request.method))
       return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
-    if (url.pathname === '/health')
+    if (url.pathname === '/health') {
+      let relay: boolean;
+      try {
+        relay = relayEnabled(env);
+      } catch {
+        return Response.json(
+          { ok: false, network: 'unavailable', relay: false },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } },
+        );
+      }
       return Response.json(
-        { ok: true, network: 'stun', relay: false },
+        { ok: true, network: relay ? 'turn' : 'stun', relay },
         {
           headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
         },
       );
+    }
     const asset = await env.ASSETS.fetch(request);
     const response = new Response(asset.body, asset);
     const signal = `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}`;

@@ -8,6 +8,7 @@ import {
   object,
   parseSignal,
   SESSION_TTL_MS,
+  ACTIVE_TRANSFER_TTL_MS,
   TOKEN_PATTERN,
 } from '../../../src/contracts/transfer';
 
@@ -22,6 +23,7 @@ type Session = {
 type Options = {
   origins: string[];
   ttlMs?: number;
+  activeTtlMs?: number;
   maxSessions?: number;
   maxSockets?: number;
   ice?: IceProvider;
@@ -31,6 +33,7 @@ const hash = (text: string) => createHash('sha256').update(text).digest();
 export function createSignalingServer({
   origins,
   ttlMs = SESSION_TTL_MS,
+  activeTtlMs = ACTIVE_TRANSFER_TTL_MS,
   maxSessions = 100,
   maxSockets = 220,
   ice = createIceProvider({}),
@@ -166,6 +169,9 @@ export function createSignalingServer({
             !timingSafeEqual(session.admissionHash, hash(message.admission))
           )
             throw new Error('Unavailable.');
+          clearTimeout(session.timer);
+          session.expiresAt = Date.now() + activeTtlMs;
+          session.timer = setTimeout(() => remove(session, 'expired'), activeTtlMs);
           session.receiver = socket;
           membership.set(socket, session);
           clearTimeout(admissionDeadline);
@@ -174,7 +180,11 @@ export function createSignalingServer({
             expiresAt: session.expiresAt,
             ice: ice.issue(session.expiresAt),
           });
-          send(session.sender, { type: 'paired', ice: ice.issue(session.expiresAt) });
+          send(session.sender, {
+            type: 'paired',
+            expiresAt: session.expiresAt,
+            ice: ice.issue(session.expiresAt),
+          });
         } else if (message.type === 'signal' && existing && existing.expiresAt > Date.now()) {
           const data = parseSignal(message.data);
           const sender = existing.sender === socket;

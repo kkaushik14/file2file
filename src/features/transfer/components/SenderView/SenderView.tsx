@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { MAX_FILE_BYTES, validPin } from '@/contracts/transfer';
+import { MAX_FILE_LABEL, MAX_FILE_BYTES, validPin } from '@/contracts/transfer';
 import { ActionButton } from '@/components/ui/ActionButton/ActionButton';
 import { TransferSession, type TransferProgress } from '../../domain/session';
 import { PrivacyNote } from '../PrivacyNote/PrivacyNote';
@@ -65,7 +65,7 @@ export function SenderView() {
     event.preventDefault();
     if (busy) return;
     if (!file || file.size > MAX_FILE_BYTES || !validPin(pin)) {
-      setError('Choose a file up to 50 MiB and a 6- or 8-digit PIN.');
+      setError(`Choose a file up to ${MAX_FILE_LABEL} and a 6- or 8-digit PIN.`);
       return;
     }
     if (!globalThis.isSecureContext || !crypto.subtle || !globalThis.RTCPeerConnection) {
@@ -78,6 +78,12 @@ export function SenderView() {
     setComplete(false);
     setProgress({ label: 'Preparing your encrypted link', bytes: 0, total: file.size });
     const controller = new TransferSession({
+      expiry: () => {
+        if (generation.current === operation) {
+          setLink(null);
+          setCopied(false);
+        }
+      },
       progress: (next) => {
         if (generation.current === operation) setProgress(next);
       },
@@ -162,7 +168,7 @@ export function SenderView() {
                     />
                   </svg>
                   <strong>{file ? file.name : 'Choose your file'}</strong>
-                  <span>Any file type · Up to 50 MiB</span>
+                  <span>Any file type · Up to {MAX_FILE_LABEL}</span>
                   <input
                     aria-label="Choose a file"
                     type="file"
@@ -206,7 +212,7 @@ export function SenderView() {
                   onFocus={(event) => event.target.select()}
                 />
                 <p className={styles.help}>
-                  Keep this tab open. Expires at{' '}
+                  Keep this tab open. Join before{' '}
                   {new Date(link.expiresAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -237,8 +243,8 @@ export function SenderView() {
             )}
           </form>
           <p className={styles.localNote}>
-            {process.env.NEXT_PUBLIC_NETWORK_MODE === 'stun'
-              ? 'Free test preview: direct connections only. Some mobile or restricted networks need a relay, which is not enabled. Keep both tabs open.'
+            {process.env.NEXT_PUBLIC_NETWORK_MODE === 'hosted'
+              ? 'Free test preview. Keep both tabs open and devices awake. Relay availability and network restrictions can affect transfers. Use a regular desktop window for large files; try smaller files on phones.'
               : 'Keep both tabs open. Transfers connect directly when possible or use an encrypted relay when configured. Allow local-network access if your browser asks.'}
           </p>
         </div>

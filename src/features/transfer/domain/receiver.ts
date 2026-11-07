@@ -1,9 +1,11 @@
-import { CHUNK_BYTES, object, parseManifest, type Manifest } from '@/contracts/transfer';
+import { object, parseManifest, type Manifest } from '@/contracts/transfer';
 import { decode, decryptRecord, type Bytes } from './crypto';
 
 export class FileReceiver {
   private next = 0;
-  private parts: Bytes[] = [];
+  private parts: Blob[] = [];
+  private batch: Bytes[] = [];
+  private batchBytes = 0;
   private manifest: Manifest | null = null;
   private received = 0;
   private disposed = false;
@@ -25,12 +27,14 @@ export class FileReceiver {
       this.manifest = parseManifest(decode(plain));
       plain.fill(0);
     } else if (this.next <= this.manifest.chunks) {
-      const expected = Math.min(CHUNK_BYTES, this.manifest.size - this.received);
+      const expected = Math.min(this.manifest.chunkSize, this.manifest.size - this.received);
       if (plain.length !== expected) {
         plain.fill(0);
         throw new Error('Invalid chunk length.');
       }
-      this.parts.push(plain);
+      this.batch.push(plain);
+      this.batchBytes += plain.length;
+      if (this.batchBytes >= 1024 * 1024) this.flush();
       this.received += plain.length;
     } else {
       const end = object(decode(plain));
@@ -55,6 +59,7 @@ export class FileReceiver {
 
   takeBlob() {
     if (!this.complete || this.disposed) throw new Error('File is not verified.');
+    this.flush();
     const blob = new Blob(this.parts, { type: 'application/octet-stream' });
     this.clear();
     return blob;
@@ -62,8 +67,21 @@ export class FileReceiver {
 
   clear() {
     this.disposed = true;
-    for (const part of this.parts) part.fill(0);
+    for (const part of this.batch) part.fill(0);
+    this.batch = [];
+    this.batchBytes = 0;
     this.parts = [];
     this.manifest = null;
+  }
+
+  private flush() {
+    if (!this.batchBytes) return;
+    // Blob snapshots release the mutable decrypted chunks in bounded batches.
+    // The browser still owns up to MAX_FILE_BYTES of backing data; this is not
+    // a constant-memory disk stream or a guarantee against browser swapping.
+    this.parts.push(new Blob(this.batch, { type: 'application/octet-stream' }));
+    for (const part of this.batch) part.fill(0);
+    this.batch = [];
+    this.batchBytes = 0;
   }
 }

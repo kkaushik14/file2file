@@ -1,6 +1,9 @@
 import { test, expect, chromium, webkit, type Page } from '@playwright/test';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdtemp, rm, mkdir, open, stat, readFile, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { MAX_FILE_BYTES, MAX_FILE_LABEL } from '../../src/contracts/transfer';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { observeRelay, expectRelay } from './relay-evidence';
 
@@ -151,10 +154,18 @@ test('five wrong PINs clear the view without claiming the session', async ({ pag
 
 test('oversized file is rejected before creating a link', async ({ page }) => {
   await page.goto('/');
-  await chooseFile(page, 'too-large.bin', Buffer.alloc(50 * 1024 * 1024 + 1));
+  const path = test.info().outputPath('too-large.bin');
+  await mkdir(dirname(path), { recursive: true });
+  const file = await open(path, 'w');
+  try {
+    await file.truncate(MAX_FILE_BYTES + 1);
+  } finally {
+    await file.close();
+  }
+  await page.getByLabel('Choose a file').setInputFiles(path);
   await page.getByLabel('Your PIN', { exact: true }).fill('123456');
   await page.getByRole('button', { name: 'Create transfer link' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('50 MiB');
+  await expect(page.getByRole('main').getByRole('alert')).toContainText(MAX_FILE_LABEL);
   await expect(page.getByLabel('Your private link')).toHaveCount(0);
 });
 
@@ -188,5 +199,242 @@ test('invalid link and responsive keyboard-accessible views', async ({ page, bro
     );
     await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+  }
+});
+
+// Stream fixtures and download hashing so the test runner does not itself hold
+// another GiB-sized Buffer while measuring a real browser transfer.
+test('large-file benchmark downloads with matching SHA-256', async ({ page, browser }) => {
+  test.setTimeout(12 * 60_000);
+  const size = Number(process.env.LARGE_TEST_BYTES || MAX_FILE_BYTES);
+  if (!Number.isSafeInteger(size) || size < 1 || size > MAX_FILE_BYTES)
+    throw new Error('Invalid large-file test size');
+  const path = test.info().outputPath('maximum.bin');
+  await mkdir(dirname(path), { recursive: true });
+  const file = await open(path, 'w');
+  const expected = createHash('sha256');
+  const chunk = Buffer.alloc(1024 * 1024);
+  for (let i = 0; i < chunk.length; i++) chunk[i] = i % 251;
+  try {
+    for (let offset = 0; offset < size; offset += chunk.length) {
+      chunk.writeUInt32BE(offset / chunk.length, 0);
+      const part = chunk.subarray(0, Math.min(chunk.length, size - offset));
+      await file.writeFile(part);
+      expected.update(part);
+    }
+  } finally {
+    await file.close();
+  }
+  await page.goto('/');
+  await page.getByLabel('Choose a file').setInputFiles(path);
+  await page.getByLabel('Your PIN', { exact: true }).fill('123456');
+  await page.getByRole('button', { name: 'Create transfer link' }).click();
+  await expect(page.getByLabel('Your private link')).toBeVisible();
+  const profile =
+    process.env.LARGE_TEST_PERSISTENT === '1' ||
+    (process.env.LARGE_TEST_PERSISTENT !== '0' && size > 2 * 1024 * 1024 * 1024)
+      ? await mkdtemp(join(tmpdir(), 'file2file-large-profile-'))
+      : undefined;
+  const options = {
+    acceptDownloads: true,
+    permissions: browser.browserType().name() === 'chromium' ? ['local-network-access'] : [],
+  };
+  const context = profile
+    ? await browser.browserType().launchPersistentContext(profile, options)
+    : await browser.newContext(options);
+  try {
+    const receiver = await context.newPage();
+    const errors: string[] = [];
+    for (const current of [page, receiver])
+      current.on('pageerror', (error) => errors.push(error.message));
+    await receiver.goto(await page.getByLabel('Your private link').inputValue());
+    await receiver.getByLabel('Transfer PIN').fill('123456');
+    const started = Date.now();
+    console.log(
+      JSON.stringify({
+        phase: 'transfer-started',
+        engine: browser.browserType().name(),
+        bytes: size,
+        persistentProfile: Boolean(profile),
+      }),
+    );
+    await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
+    await Promise.race([
+      receiver
+        .getByRole('link', { name: 'Save file' })
+        .waitFor({ state: 'visible', timeout: 10 * 60_000 }),
+      receiver
+        .getByRole('main')
+        .getByRole('alert')
+        .waitFor({ state: 'visible', timeout: 10 * 60_000 })
+        .then(async () => {
+          throw new Error(await receiver.getByRole('main').getByRole('alert').innerText());
+        }),
+    ]);
+    const verifiedSeconds = (Date.now() - started) / 1000;
+    const pending = receiver.waitForEvent('download');
+    await receiver.getByRole('link', { name: 'Save file' }).click();
+    const download = await pending;
+    const savedPath = (await download.path())!;
+    expect((await stat(savedPath)).size).toBe(size);
+    const actual = createHash('sha256');
+    for await (const data of createReadStream(savedPath)) actual.update(data);
+    expect(actual.digest('hex')).toBe(expected.digest('hex'));
+    expect(download.suggestedFilename()).toBe('maximum.bin');
+    console.log(
+      JSON.stringify({
+        engine: browser.browserType().name(),
+        bytes: size,
+        verifiedSeconds,
+        downloadedAndHashedSeconds: (Date.now() - started) / 1000,
+      }),
+    );
+    await expect(page.getByText('File received and verified.')).toBeVisible();
+    await receiver.getByRole('button', { name: 'Clear file from this page' }).click();
+    await expect(receiver.getByRole('link', { name: 'Save file' })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  } finally {
+    await context.close();
+    if (profile) await rm(profile, { recursive: true, force: true });
+    await rm(path, { force: true });
+  }
+});
+
+test('a slow receiver applies backpressure without growing the receive queue', async ({
+  page,
+  browser,
+}) => {
+  const bytes = Buffer.alloc(8 * 1024 * 1024 + 7, 83);
+  const url = await createTransfer(page, bytes, 'slow.bin');
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    permissions: browser.browserType().name() === 'chromium' ? ['local-network-access'] : [],
+  });
+  try {
+    // Delay scheduling only; decrypt and integrity verification remain native.
+    await context.addInitScript(() => {
+      const decrypt = SubtleCrypto.prototype.decrypt;
+      SubtleCrypto.prototype.decrypt = async function (...args) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return decrypt.apply(this, args);
+      };
+    });
+    const receiver = await context.newPage();
+    await receiver.goto(url);
+    await receiver.getByLabel('Transfer PIN').fill('123456');
+    await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
+    await expect(receiver.getByRole('link', { name: 'Save file' })).toBeVisible({
+      timeout: 30_000,
+    });
+    const pending = receiver.waitForEvent('download');
+    await receiver.getByRole('link', { name: 'Save file' }).click();
+    expect(await readFile((await (await pending).path())!)).toEqual(bytes);
+    await expect(page.getByText('File received and verified.')).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+for (const attack of ['future', 'repeated'] as const) {
+  test(`sender rejects authenticated ${attack} receive credits`, async ({ page, browser }) => {
+    const url = await createTransfer(page, Buffer.alloc(8 * 1024 * 1024, 57));
+    const context = await browser.newContext({
+      permissions: browser.browserType().name() === 'chromium' ? ['local-network-access'] : [],
+    });
+    try {
+      // A peer knows its directional key. Authenticate a dishonest acknowledgement
+      // through native WebCrypto, rather than bypassing record authentication.
+      await context.addInitScript((attack) => {
+        const encrypt = SubtleCrypto.prototype.encrypt;
+        let firstCredit: number | undefined;
+        SubtleCrypto.prototype.encrypt = function (algorithm, key, data) {
+          try {
+            const control = JSON.parse(new TextDecoder().decode(data));
+            if (control.type === 'progress') {
+              firstCredit ??= control.received;
+              control.received = attack === 'future' ? 4 * 1024 * 1024 * 1024 : firstCredit;
+              data = new TextEncoder().encode(JSON.stringify(control));
+            }
+          } catch {
+            /* Other encrypted records are unchanged. */
+          }
+          return encrypt.call(this, algorithm, key, data);
+        };
+      }, attack);
+      const receiver = await context.newPage();
+      await receiver.goto(url);
+      await receiver.getByLabel('Transfer PIN').fill('123456');
+      await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
+      await expect(page.getByRole('main').getByRole('alert')).toContainText('verification failed', {
+        timeout: 30_000,
+      });
+      await expect(page.getByText('File received and verified.')).toHaveCount(0);
+      await expect(receiver.getByRole('link', { name: 'Save file' })).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test('verified download uses the active deadline instead of the original join deadline', async ({
+  page,
+  browser,
+}) => {
+  const url = await createTransfer(page);
+  const context = await browser.newContext({
+    permissions: browser.browserType().name() === 'chromium' ? ['local-network-access'] : [],
+  });
+  try {
+    const receiver = await context.newPage();
+    await receiver.clock.install();
+    await receiver.goto(url);
+    await receiver.getByLabel('Transfer PIN').fill('123456');
+    await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
+    await expect(receiver.getByRole('link', { name: 'Save file' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await receiver.clock.fastForward('16:00');
+    await expect(receiver.getByRole('link', { name: 'Save file' })).toBeVisible();
+    await receiver.clock.fastForward('45:00');
+    await expect(receiver.getByRole('link', { name: 'Save file' })).toHaveCount(0);
+    await expect(receiver.getByRole('main').getByRole('alert')).toContainText('expired');
+  } finally {
+    await context.close();
+  }
+});
+
+test('cancelling a slow transfer releases the sender waiting for receive credit', async ({
+  page,
+  browser,
+}) => {
+  const url = await createTransfer(page, Buffer.alloc(8 * 1024 * 1024, 42));
+  const context = await browser.newContext({
+    permissions: browser.browserType().name() === 'chromium' ? ['local-network-access'] : [],
+  });
+  try {
+    await context.addInitScript(() => {
+      const decrypt = SubtleCrypto.prototype.decrypt;
+      SubtleCrypto.prototype.decrypt = async function (...args) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return decrypt.apply(this, args);
+      };
+    });
+    const receiver = await context.newPage();
+    await receiver.goto(url);
+    await receiver.getByLabel('Transfer PIN').fill('123456');
+    await receiver.getByRole('button', { name: 'Unlock and receive' }).click();
+    await expect
+      .poll(() =>
+        receiver.getByRole('progressbar').evaluate((el) => (el as HTMLProgressElement).value),
+      )
+      .toBeGreaterThan(0);
+    await receiver.getByRole('button', { name: 'Cancel transfer' }).click();
+    await expect(page.getByRole('main').getByRole('alert')).toContainText(
+      /unavailable|disconnected|connection failed|transfer stopped/i,
+    );
+    await expect(page.getByText('File received and verified.')).toHaveCount(0);
+    await expect(receiver.getByRole('link', { name: 'Save file' })).toHaveCount(0);
+  } finally {
+    await context.close();
   }
 });

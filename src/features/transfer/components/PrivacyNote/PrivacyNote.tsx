@@ -1,3 +1,4 @@
+import { MAX_FILE_LABEL } from '@/contracts/transfer';
 import styles from './PrivacyNote.module.css';
 
 export function PrivacyNote() {
@@ -11,7 +12,7 @@ export function PrivacyNote() {
       <ol>
         <li>
           <strong>Choose a file.</strong>
-          <span>Up to 50 MiB. It stays in your browser until someone connects.</span>
+          <span>Up to {MAX_FILE_LABEL}. It stays in your browser until someone connects.</span>
         </li>
         <li>
           <strong>Send the link and PIN.</strong>
@@ -19,7 +20,7 @@ export function PrivacyNote() {
         </li>
         <li>
           <strong>They verify and save.</strong>
-          <span>The link expires after 15 minutes or when either side disconnects.</span>
+          <span>Join within 15 minutes. Once connected, you have up to 60 minutes to finish.</span>
         </li>
       </ol>
       <p className={styles.disclosure}>

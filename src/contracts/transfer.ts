@@ -1,7 +1,12 @@
-export const MAX_FILE_BYTES = 50 * 1024 * 1024;
-export const CHUNK_BYTES = 12 * 1024;
+export const MAX_FILE_BYTES = 8 * 1024 * 1024 * 1024;
+export const MAX_FILE_LABEL = '8 GiB';
+export const MIN_CHUNK_BYTES = 12 * 1024;
+export const CHUNK_BYTES = 48 * 1024;
+export const TRANSFER_WINDOW_BYTES = CHUNK_BYTES * 80;
+export const TRANSFER_ACK_BYTES = 96 * 1024;
 export const MAX_RECORD_BYTES = CHUNK_BYTES + 20;
 export const SESSION_TTL_MS = 15 * 60 * 1000;
+export const ACTIVE_TRANSFER_TTL_MS = 60 * 60 * 1000;
 export const KDF_PROFILE = 'PBKDF2-SHA256-600000';
 export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 export const ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
@@ -15,7 +20,7 @@ export type Manifest = {
 };
 
 export type LinkEnvelope = {
-  v: 1;
+  v: 2;
   id: string;
   expiresAt: number;
   kdf: typeof KDF_PROFILE;
@@ -49,8 +54,8 @@ export function parseManifest(value: unknown): Manifest {
     !Number.isSafeInteger(m.size) ||
     (m.size as number) < 0 ||
     (m.size as number) > MAX_FILE_BYTES ||
-    m.chunkSize !== CHUNK_BYTES ||
-    m.chunks !== Math.ceil((m.size as number) / CHUNK_BYTES)
+    (m.chunkSize !== CHUNK_BYTES && m.chunkSize !== MIN_CHUNK_BYTES) ||
+    m.chunks !== Math.ceil((m.size as number) / (m.chunkSize as number))
   )
     throw new Error('Invalid file manifest.');
   return m as Manifest;

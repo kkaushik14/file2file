@@ -1,3 +1,4 @@
+import { MAX_FILE_LABEL } from '@/contracts/transfer';
 import { InformationPage } from '../InformationPage/InformationPage';
 
 export function TermsView() {
@@ -14,9 +15,10 @@ export function TermsView() {
           permission and supervision from a parent or guardian where required.
         </p>
         <p>
-          This preview sends one file of up to 50 MiB to one receiver. Links expire 15 minutes after
-          creation. Keep both tabs open; leaving a transfer page, cancellation, a network failure,
-          or a service restart can end the session.
+          This preview sends one file of up to {MAX_FILE_LABEL} to one receiver. Unused links expire
+          15 minutes after creation. Once admitted, a transfer has up to 60 minutes to finish. Keep
+          both tabs open; leaving a transfer page, cancellation, a network failure, or a service
+          restart can end the session.
         </p>
       </section>
       <section>
@@ -41,10 +43,10 @@ export function TermsView() {
           Recipients can copy and keep files; expiry and cancellation cannot recall a saved file.
         </p>
         <p>
-          The hosted preview has no TURN relay, so some networks and Safari/WebKit connections will
-          fail. File2File cannot recover lost files, PINs, or interrupted transfers. Read{' '}
-          <a href="/security/">Security</a> and <a href="/help/">Help</a> before relying on the
-          service.
+          The free relay has limited ports, capacity and availability, so some networks or devices
+          may still be unable to transfer. File2File cannot recover lost files, PINs, or interrupted
+          transfers. Read <a href="/security/">Security</a> and <a href="/help/">Help</a> before
+          relying on the service.
         </p>
       </section>
       <section>

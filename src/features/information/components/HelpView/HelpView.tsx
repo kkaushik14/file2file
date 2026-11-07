@@ -1,3 +1,4 @@
+import { MAX_FILE_BYTES, MAX_FILE_LABEL } from '@/contracts/transfer';
 import Link from 'next/link';
 import { InformationPage } from '../InformationPage/InformationPage';
 
@@ -11,8 +12,12 @@ export function HelpView() {
         <h2>Send a file</h2>
         <ol>
           <li>
-            Open <Link href="/">Send a file</Link>, choose one file up to 50 MiB, and enter a 6- or
-            8-digit PIN. Prefer an unpredictable 8-digit PIN.
+            Open{' '}
+            <Link href="/" prefetch={false}>
+              Send a file
+            </Link>
+            , choose one file up to {MAX_FILE_LABEL}, and enter a 6- or 8-digit PIN. Prefer an
+            unpredictable 8-digit PIN.
           </li>
           <li>
             Create a transfer link. Share it only with your intended receiver, and send the PIN
@@ -50,9 +55,11 @@ export function HelpView() {
         <details>
           <summary>The link is missing, expired, or unavailable</summary>
           <p>
-            Links last 15 minutes from creation and allow one receiver. Ask for a new link if either
-            tab was closed, a transfer was cancelled, or another receiver claimed it. A reload after
-            opening a link cannot recover the secret removed from the address bar.
+            Unused links last 15 minutes from creation and allow one receiver. Once admitted, a
+            transfer has up to 60 minutes to finish; a stalled connection stops after 30 seconds.
+            Ask for a new link if either tab was closed, a transfer was cancelled, or another
+            receiver claimed it. A reload after opening a link cannot recover the secret removed
+            from the address bar.
           </p>
         </details>
         <details>
@@ -71,18 +78,22 @@ export function HelpView() {
             site. Try a different network or browser if policy allows.
           </p>
           <p>
-            This free hosted preview uses STUN without a TURN relay. Restrictive NATs, firewalls,
-            corporate networks, and the currently unresolved hosted Safari/WebKit path can prevent a
-            connection. There is no guaranteed cross-network fallback yet. Do not disable your
-            firewall or other security protections to make a transfer work.
+            The preview supports a free ExpressTURN fallback on UDP/TCP port 3478 when configured.
+            Networks that block this port can still prevent a connection; the free plan has no TLS
+            relay on port 443. Free quota exhaustion or provider outages can also stop relaying. Do
+            not disable your firewall or other security protections to make a transfer work.
           </p>
         </details>
         <details>
           <summary>Where is my file, or can I resume?</summary>
           <p>
             Look in your browser’s downloads after selecting Save file. The service has no stored
-            copy, recovery, or resume feature. Request a new transfer if it fails. The limit is 50
-            MiB (52,428,800 bytes), and browser memory use can exceed the file size.
+            copy, recovery, or resume feature. Request a new transfer if it fails. The limit is{' '}
+            {MAX_FILE_LABEL} ({MAX_FILE_BYTES.toLocaleString('en-US')} bytes). Large files need
+            sufficient memory and temporary disk space and must finish within the 60-minute active
+            session. Use a regular desktop browser window for multi-GiB files; private windows can
+            have lower storage limits. Try smaller files on phones or if the browser closes the tab.
+            Browser backing storage can exceed the file size.
           </p>
         </details>
       </section>

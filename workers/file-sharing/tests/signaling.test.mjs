@@ -42,7 +42,7 @@ async function request(socket, message) {
   return pending;
 }
 
-test('static routes have restrictive headers and health honestly reports no relay', async () => {
+test('static routes have restrictive headers and health reports configured relay mode', async () => {
   if (origin.startsWith('https:')) {
     const redirect = await fetch(origin.replace(/^https:/, 'http:') + '/', { redirect: 'manual' });
     assert.equal(redirect.status, 308);
@@ -75,8 +75,8 @@ test('static routes have restrictive headers and health honestly reports no rela
   }
   assert.deepEqual(await (await fetch(origin + '/health')).json(), {
     ok: true,
-    network: 'stun',
-    relay: false,
+    network: process.env.CLOUD_TEST_NETWORK || 'stun',
+    relay: process.env.CLOUD_TEST_NETWORK === 'turn',
   });
   assert.equal((await fetch(origin + '/', { method: 'POST' })).status, 405);
   assert.equal((await fetch(origin + '/missing-page/')).status, 404);
@@ -100,7 +100,7 @@ test('only an admitted single receiver obtains ICE; signals and cancellation fol
     admission: created.admission,
   });
   assert.equal(joined.type, 'joined');
-  assert.equal(joined.ice.mode, 'stun');
+  assert.equal(joined.ice.mode, process.env.CLOUD_TEST_NETWORK || 'stun');
   assert.equal((await paired).type, 'paired');
   const third = await connect();
   assert.equal(

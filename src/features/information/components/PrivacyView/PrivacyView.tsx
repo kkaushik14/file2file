@@ -26,7 +26,8 @@ export function PrivacyView() {
           The signaling service processes IP addresses, random session identifiers, admission-token
           hashes, expiry times, and WebRTC connection information to match two browsers and limit
           abuse. Session records are held in memory and removed on disconnect, cancellation, expiry,
-          or service restart. Sessions last at most 15 minutes.
+          or service restart. Unused links last at most 15 minutes; after admission, an active
+          transfer can last up to 60 minutes.
         </p>
         <p>
           Connection and abuse counters are temporary, bounded, and held in memory. Expired counters
@@ -35,13 +36,16 @@ export function PrivacyView() {
         </p>
         <p>
           Peers may learn each other’s network addresses. The public STUN service sees addresses and
-          ports used for connection discovery. The hosted preview currently has no TURN relay.
+          ports used for connection discovery. When a TURN relay is used, it processes encrypted
+          packets and can observe network addresses, timing and traffic volume, but is not given the
+          application file key or PIN.
         </p>
       </section>
       <section>
         <h2>Hosting and third-party processing</h2>
         <p>
-          Cloudflare hosts the frontend and signaling service and provides public STUN. It processes
+          Cloudflare hosts the frontend and signaling service and provides public STUN and
+          server-side DNS resolution for the fixed connection-service hostnames. It processes
           network/request information, such as IP addresses, requested paths, timestamps, and
           browser information, to deliver and protect its services. Its infrastructure may process
           data internationally and retain operational or security records separately from the app’s
@@ -52,8 +56,19 @@ export function PrivacyView() {
           <a href="https://www.cloudflare.com/privacypolicy/" rel="noreferrer">
             Cloudflare’s Privacy Policy
           </a>
-          . The app’s 15-minute session limit is not a promise that provider logs are deleted within
-          15 minutes.
+          . The app’s session deadlines do not determine how long providers retain their logs.
+        </p>
+      </section>
+      <section>
+        <h2>Optional TURN relay</h2>
+        <p>
+          ExpressTURN provides the configured free relay. Its own operational records and retention
+          are outside the app’s session cleanup. Review{' '}
+          <a href="https://www.expressturn.com/privacy" rel="noreferrer">
+            ExpressTURN’s Privacy Policy
+          </a>
+          . Direct connections are preferred when available. No file content is uploaded to a stored
+          file-sharing service, and the relay is not an anonymity service.
         </p>
       </section>
       <section>
@@ -72,7 +87,9 @@ export function PrivacyView() {
         </p>
         <p>
           Clearing or leaving a transfer releases app references and download URLs. This is not a
-          guarantee of physical memory erasure or removal of copies made elsewhere.
+          guarantee of physical memory erasure or removal of copies made elsewhere. Received files
+          use browser-managed Blob storage; the browser may back this with temporary disk or swap.
+          The app does not control its physical deletion or operating-system copies.
         </p>
       </section>
       <section>

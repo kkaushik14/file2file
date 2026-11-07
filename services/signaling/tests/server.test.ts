@@ -8,8 +8,8 @@ import { createIceProvider, type IceProvider } from '../src/ice';
 import { randomBytes } from 'node:crypto';
 
 const origin = 'http://127.0.0.1:4174';
-async function fixture(ttlMs = 60_000, ice?: IceProvider) {
-  const app = createSignalingServer({ origins: [origin], ttlMs, ice });
+async function fixture(ttlMs = 60_000, ice?: IceProvider, activeTtlMs?: number) {
+  const app = createSignalingServer({ origins: [origin], ttlMs, ice, activeTtlMs });
   app.server.listen(0, '127.0.0.1');
   await once(app.server, 'listening');
   const url = `ws://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
@@ -178,6 +178,31 @@ test('per-address upgrade cap rejects excess sockets and releases capacity after
     await closed;
     const replacement = await app.connect();
     assert.equal((await request(replacement, { type: 'create' })).type, 'created');
+  } finally {
+    await app.close();
+  }
+});
+
+test('admission replaces the unused-link timer with a bounded active-transfer timer', async () => {
+  const app = await fixture(150, undefined, 600);
+  try {
+    const sender = await app.connect();
+    const created = await request(sender, { type: 'create' });
+    const receiver = await app.connect();
+    const paired = once(sender, 'message');
+    const joined = await request(receiver, {
+      type: 'join',
+      id: created.id,
+      admission: created.admission,
+    });
+    const senderPair = JSON.parse((await paired)[0].toString());
+    assert.ok(joined.expiresAt > created.expiresAt);
+    assert.equal(senderPair.expiresAt, joined.expiresAt);
+    const ended = once(receiver, 'message');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(receiver.readyState, WebSocket.OPEN);
+    const [message] = await ended;
+    assert.equal(JSON.parse(message.toString()).reason, 'expired');
   } finally {
     await app.close();
   }

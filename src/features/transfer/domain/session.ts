@@ -1,13 +1,18 @@
 import {
   CHUNK_BYTES,
+  MIN_CHUNK_BYTES,
+  ACTIVE_TRANSFER_TTL_MS,
+  TRANSFER_ACK_BYTES,
   ID_PATTERN,
   MAX_FILE_BYTES,
+  MAX_FILE_LABEL,
   MAX_RECORD_BYTES,
   object,
   parseSignal,
   safeFilename,
   SESSION_TTL_MS,
   TOKEN_PATTERN,
+  TRANSFER_WINDOW_BYTES,
   type LinkEnvelope,
   type Manifest,
   type SignalData,
@@ -27,6 +32,7 @@ import { parseIceConfiguration } from '@/contracts/ice';
 
 export type TransferProgress = { label: string; bytes: number; total: number };
 type Callbacks = {
+  expiry: (expiresAt: number) => void;
   progress: (progress: TransferProgress) => void;
   error: (message: string) => void;
   complete: (file?: { blob: Blob; name: string }) => void;
@@ -47,6 +53,12 @@ export class TransferSession {
   private expired?: ReturnType<typeof setTimeout>;
   private inactivity?: ReturnType<typeof setTimeout>;
   private controlSequence = 0;
+  private responseSequence = 1;
+  private sentBytes = 0;
+  private acknowledgedBytes = 0;
+  private creditAvailable?: () => void;
+  private completionSent = false;
+  private lastReceiveUpdate = 0;
   private queuedBytes = 0;
   private records = Promise.resolve();
   private signals = Promise.resolve();
@@ -58,7 +70,7 @@ export class TransferSession {
   constructor(private callbacks: Callbacks) {}
 
   async sendFile(file: File, pin: string) {
-    if (file.size > MAX_FILE_BYTES) throw new Error('Choose a file of 50 MiB or less.');
+    if (file.size > MAX_FILE_BYTES) throw new Error(`Choose a file of ${MAX_FILE_LABEL} or less.`);
     this.file = file;
     this.refreshDeadline();
     this.socket = await connectSignaling(
@@ -110,9 +122,14 @@ export class TransferSession {
     this.signal({ type: 'join', id: this.id, admission });
   }
 
-  private setExpiry(expiry: number) {
-    if (expiry <= Date.now() || expiry > Date.now() + SESSION_TTL_MS + 60_000)
+  private setExpiry(expiry: number, maximum = SESSION_TTL_MS) {
+    if (
+      !Number.isSafeInteger(expiry) ||
+      expiry <= Date.now() ||
+      expiry > Date.now() + maximum + 60_000
+    )
       throw new Error('Session expired or invalid.');
+    clearTimeout(this.expired);
     this.expired = setTimeout(
       () => this.fail('This transfer has expired. Ask the sender for a new link.'),
       expiry - Date.now(),
@@ -166,7 +183,7 @@ export class TransferSession {
           this.creation.resolve(message as Created);
           this.creation = undefined;
         } else if (message.type === 'paired' && this.role === 'sender') {
-          this.setupPeer(message.ice);
+          this.setupPeer(message.ice, message.expiresAt);
           this.refreshDeadline();
           this.callbacks.progress({
             label: 'Connecting to the receiver',
@@ -174,13 +191,13 @@ export class TransferSession {
             total: this.file?.size || 0,
           });
           const peer = this.peer!;
-          this.attachChannel(peer.createDataChannel('file2file-v1', { ordered: true }));
+          this.attachChannel(peer.createDataChannel('file2file-v2', { ordered: true }));
           await peer.setLocalDescription(await peer.createOffer());
           this.signal({ type: 'signal', data: { type: 'offer', sdp: peer.localDescription!.sdp } });
         } else if (message.type === 'signal') {
           await this.acceptSignal(parseSignal(message.data));
         } else if (message.type === 'joined' && this.role === 'receiver') {
-          this.setupPeer(message.ice);
+          this.setupPeer(message.ice, message.expiresAt);
         } else if (message.type === 'ended' || message.type === 'error') {
           throw new Error(
             message.reason === 'expired'
@@ -198,9 +215,17 @@ export class TransferSession {
       });
   }
 
-  private setupPeer(value: unknown) {
+  private setupPeer(value: unknown, expiresAt: unknown) {
     if (this.peer) throw new Error('Connection already configured.');
     const configuration = parseIceConfiguration(value);
+    if (
+      typeof expiresAt !== 'number' ||
+      configuration.expiresAt < expiresAt ||
+      configuration.expiresAt > expiresAt + 61_000
+    )
+      throw new Error('Invalid transfer expiry.');
+    this.setExpiry(expiresAt, ACTIVE_TRANSFER_TTL_MS);
+    this.callbacks.expiry(expiresAt);
     const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
     if (configuration.mode === 'local' && !local)
       throw new Error('Cross-network transfers require a configured relay service.');
@@ -229,7 +254,7 @@ export class TransferSession {
       if (
         this.role !== 'receiver' ||
         this.channel ||
-        channel.label !== 'file2file-v1' ||
+        channel.label !== 'file2file-v2' ||
         !channel.ordered ||
         channel.maxRetransmits !== null ||
         channel.maxPacketLifeTime !== null
@@ -302,7 +327,7 @@ export class TransferSession {
         return;
       }
       this.queuedBytes += data.byteLength;
-      if (this.queuedBytes > 512 * 1024) {
+      if (this.queuedBytes > 8 * 1024 * 1024) {
         this.fail('The receiver cannot keep up. Try a smaller file.');
         return;
       }
@@ -328,17 +353,44 @@ export class TransferSession {
     const channel = this.channel!;
     const maximum = this.peer?.sctp?.maxMessageSize;
     if (maximum && record.byteLength > maximum) throw new Error('Peer message limit is too small.');
-    const start = Date.now();
-    if (channel.bufferedAmount > 256 * 1024) {
-      while (channel.bufferedAmount > channel.bufferedAmountLowThreshold) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        this.assertActive();
-        if (Date.now() - start > 30_000) throw new Error('Send timed out.');
-      }
-    }
+    if (channel.bufferedAmount > 256 * 1024) await this.waitForCapacity('buffer');
     if (channel.readyState !== 'open') throw new Error('Connection closed.');
     channel.send(record.buffer);
     this.refreshDeadline();
+  }
+
+  private async waitForCapacity(kind: 'buffer' | 'receiver') {
+    this.assertActive();
+    const channel = this.channel!;
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        channel.removeEventListener('bufferedamountlow', check);
+        this.abort.signal.removeEventListener('abort', cancelled);
+        if (this.creditAvailable === check) this.creditAvailable = undefined;
+        if (error) reject(error);
+        else resolve();
+      };
+      const check = () => {
+        if (channel.readyState !== 'open') return finish(new Error('Connection closed.'));
+        const ready =
+          kind === 'buffer'
+            ? channel.bufferedAmount <= channel.bufferedAmountLowThreshold
+            : this.sentBytes - this.acknowledgedBytes < TRANSFER_WINDOW_BYTES;
+        if (ready) finish();
+      };
+      const cancelled = () => finish(new Error('Transfer cancelled.'));
+      const timer = setTimeout(() => finish(new Error('Transfer capacity timed out.')), 30_000);
+      if (kind === 'buffer') channel.addEventListener('bufferedamountlow', check);
+      else this.creditAvailable = check;
+      this.abort.signal.addEventListener('abort', cancelled, { once: true });
+      if (this.abort.signal.aborted) cancelled();
+      else check(); // Covers capacity becoming available before subscription.
+    });
+    this.assertActive();
   }
 
   private async acceptControlRecord(record: Bytes) {
@@ -354,8 +406,23 @@ export class TransferSession {
     plain.fill(0);
     if (this.controlSequence === 0 && control.type === 'ready') {
       this.controlSequence += 1;
-      await this.streamFile();
-    } else if (this.controlSequence === 1 && control.type === 'ack') {
+      // Do not hold the incoming-control queue while waiting for receiver credit.
+      void this.streamFile().catch(() => this.fail('The file transfer stopped. Try a new link.'));
+    } else if (this.controlSequence > 0 && control.type === 'progress') {
+      if (
+        control.received !== this.acknowledgedBytes + TRANSFER_ACK_BYTES ||
+        (control.received as number) > this.sentBytes
+      )
+        throw new Error('Invalid receive credit.');
+      this.acknowledgedBytes = control.received as number;
+      this.creditAvailable?.();
+      this.controlSequence += 1;
+    } else if (
+      this.controlSequence > 0 &&
+      control.type === 'ack' &&
+      this.completionSent &&
+      control.size === this.file?.size
+    ) {
       this.done = true;
       this.callbacks.complete();
       this.close();
@@ -364,34 +431,48 @@ export class TransferSession {
 
   private async streamFile() {
     const file = this.file!;
+    const maximum = this.peer?.sctp?.maxMessageSize;
+    const chunkSize =
+      maximum === 0 || (maximum !== undefined && maximum >= CHUNK_BYTES + 20)
+        ? CHUNK_BYTES
+        : MIN_CHUNK_BYTES;
     const manifest: Manifest = {
       type: 'manifest',
       name: safeFilename(file.name),
       size: file.size,
-      chunkSize: CHUNK_BYTES,
-      chunks: Math.ceil(file.size / CHUNK_BYTES),
+      chunkSize,
+      chunks: Math.ceil(file.size / chunkSize),
     };
     await this.sendRecord('sender', 0, encode(manifest));
     let lastUpdate = 0;
-    for (let index = 0; index < manifest.chunks; index += 1) {
+    // Read bounded groups; negotiate 48 KiB records and retain the 12 KiB wire
+    // record size when required. This avoids one file-read operation per record.
+    const readBytes = 768 * 1024;
+    for (let offset = 0; offset < file.size; offset += readBytes) {
       this.assertActive();
-      const bytes = new Uint8Array(
-        await file.slice(index * CHUNK_BYTES, (index + 1) * CHUNK_BYTES).arrayBuffer(),
-      );
+      const batch = new Uint8Array(await file.slice(offset, offset + readBytes).arrayBuffer());
       try {
-        await this.sendRecord('sender', index + 1, bytes);
+        for (let start = 0; start < batch.length; start += chunkSize) {
+          const index = (offset + start) / chunkSize;
+          if (this.sentBytes - this.acknowledgedBytes >= TRANSFER_WINDOW_BYTES)
+            await this.waitForCapacity('receiver');
+          const chunk = batch.subarray(start, start + chunkSize);
+          await this.sendRecord('sender', index + 1, chunk);
+          this.sentBytes += chunk.length;
+          if (Date.now() - lastUpdate > 100) {
+            this.callbacks.progress({
+              label: 'Sending encrypted file',
+              bytes: Math.min((index + 1) * chunkSize, file.size),
+              total: file.size,
+            });
+            lastUpdate = Date.now();
+          }
+        }
       } finally {
-        bytes.fill(0);
-      }
-      if (Date.now() - lastUpdate > 100) {
-        this.callbacks.progress({
-          label: 'Sending encrypted file',
-          bytes: Math.min((index + 1) * CHUNK_BYTES, file.size),
-          total: file.size,
-        });
-        lastUpdate = Date.now();
+        batch.fill(0);
       }
     }
+    this.completionSent = true;
     await this.sendRecord(
       'sender',
       manifest.chunks + 1,
@@ -409,19 +490,32 @@ export class TransferSession {
     this.assertActive();
     if (result.complete) {
       const blob = this.receiver!.takeBlob();
-      await this.sendRecord('receiver', 1, encode({ type: 'ack' }));
+      await this.sendRecord(
+        'receiver',
+        this.responseSequence++,
+        encode({ type: 'ack', size: result.size }),
+      );
       this.done = true;
       clearTimeout(this.inactivity);
       clearTimeout(this.expired);
       this.file = undefined;
       this.keys = undefined;
       this.callbacks.complete({ blob, name: safeFilename(result.name) });
-    } else
+    } else {
+      if (result.received > 0 && result.received % TRANSFER_ACK_BYTES === 0)
+        await this.sendRecord(
+          'receiver',
+          this.responseSequence++,
+          encode({ type: 'progress', received: result.received }),
+        );
+      if (Date.now() - this.lastReceiveUpdate < 100 && result.received !== result.size) return;
+      this.lastReceiveUpdate = Date.now();
       this.callbacks.progress({
         label: 'Receiving and verifying',
         bytes: result.received,
         total: result.size,
       });
+    }
   }
 
   private disconnected() {

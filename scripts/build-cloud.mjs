@@ -11,7 +11,7 @@ const result = spawnSync(process.execPath, ['node_modules/next/dist/bin/next', '
   env: {
     ...process.env,
     NEXT_PUBLIC_SIGNAL_URL: pages ? signalOrigin : 'same-origin',
-    NEXT_PUBLIC_NETWORK_MODE: 'stun',
+    NEXT_PUBLIC_NETWORK_MODE: 'hosted',
   },
 });
 if (result.status !== 0) process.exit(result.status || 1);

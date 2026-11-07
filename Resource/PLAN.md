@@ -1,15 +1,34 @@
 # Implementation progress
 
-Updated: 2026-11-08. Free Cloudflare test preview deployed with HTTPS/WSS and public STUN; no public TURN subscription. The security/navigation milestone and GitHub deployment automation are deployed and verified.
+Updated: 2026-11-08. The security/navigation and automatic-deployment milestones are live. The current follow-up implements 8 GiB transfers, protocol v2 receive credits, public WebKit discovery fallback, and ExpressTURN Free. Final local verification passed 34 browser cases, 26 unit/service cases and separate full 8 GiB download-hash benchmarks in both engines. Hosted checks, deployment and live provider verification follow below.
 
-| Phase                   | Status          | Evidence / next gate                                                                                                                                                                                                   |
-| ----------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0 design               | Complete        | Rewritten PRD and guide resolve PIN limitations, portable KDF, authenticated records, bounded memory, expiry, cleanup, signaling authorization and trust boundaries                                                    |
-| P1 local foundation     | Complete        | Static Next App Router, named feature components, CSS Modules/tokens, strict TS, pinned npm dependencies, local scripts and checks; Portfolio rule recorded in root AGENTS                                             |
-| P2 single-file slice    | Working locally | Sender/link/PIN, memory-only signaling, encrypted WebRTC, validated download, progress, cancellation and cleanup; 0-byte, 1 MiB+17-byte and 50 MiB transfers verified in Chromium and WebKit                           |
-| P3 reliability          | Open            | Configurable STUN/TURN and temporary credentials implemented; UDP/TCP relay paths verified locally. HTTPS/WSS preview deployed; public TURN, WebKit STUN-only operation, separate networks and physical devices remain |
-| P4 larger product scope | Deferred        | Folders, streaming disk output, stored relay and resume                                                                                                                                                                |
-| P5 public release       | Preview only    | Zero-budget test deployment authorized; production security, configured relay, device evidence and operations remain                                                                                                   |
+| Phase                   | Status               | Evidence / next gate                                                                                                                      |
+| ----------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| P0 design               | Complete for preview | Explicit PIN/trust limits, bounded flow control, browser-managed Blob backing, 15-minute join and 60-minute active deadlines              |
+| P1 foundation           | Complete             | Portfolio conventions, named features, static Next export, separate Worker/Node services, Node 26.13.0                                    |
+| P2 single-file slice    | Working              | Encryption, download integrity, cancellation; 8 GiB passed in Chromium/WebKit normal receiver profiles                                    |
+| P3 reliability          | In verification      | Public DNS fallback and free relay configured; final regression/live relay checks below; physical devices and independent networks remain |
+| P4 larger product scope | Deferred             | Disk streaming, resume, folders and multiple receivers need separate design and evidence                                                  |
+| P5 public release       | Preview only         | Independent security review, operations, physical-device/network and sustained resource tests remain                                      |
+
+## Current follow-up
+
+- Version 2 authenticates receiver credits, bounds unacknowledged data to 3.75 MiB, and removes fixed polling delays. Reads use 768 KiB batches and negotiated 48 KiB records with a 12 KiB fallback. Browser progress is throttled; plaintext is batched into Blobs and mutable arrays released.
+- The cap increased from 50 MiB to 8 GiB after real transfer/download hashes passed in both engines. Full-file browser backing storage is still required. Private profiles and phones can have lower practical limits; 4 GiB private-profile Chromium download failed while normal profiles passed.
+- The owner approved a 60-minute active deadline starting at receiver admission. Unused links remain 15 minutes and stalled connections stop after 30 seconds. This does not slow fast transfers.
+- Hosted discovery retains provider hostnames and adds fresh validated public IPv4 addresses from bounded DNS-over-HTTPS. It fixes the observed WebKit hostname-discovery failure without changing browser privacy settings.
+- The owner created ExpressTURN Free (1000 GB/month, UDP/TCP 3478), approved relay-secret use, and entered the actual relay values directly in Cloudflare. No card, Premium plan or billable subscription was enabled. Live relay checks must succeed before claiming the provider works.
+- CI uses 512 MiB for the large-file regression to bound runner disk use. Full 8 GiB benchmarks run separately on direct/local paths, never consuming free relay quota.
+
+## Remaining acceptance
+
+1. Complete final local/cloud checks and live forced-relay UDP/TCP tests after push-triggered deployment.
+2. Test physical Safari/iOS/Android and Wi-Fi-to-cellular transfers in both directions. Free TURN has no TLS/443 fallback for networks blocking 3478.
+3. Profile mobile memory/KDF behavior; review static relay-credential abuse and shared quota operations before production release.
+
+## Earlier milestone history
+
+The following sections retain the evidence at their original milestones. Their 50 MiB cap, STUN-only hosting and unresolved hosted WebKit statements describe earlier builds, superseded by the current follow-up and latest [test evidence](TESTS.md).
 
 ## Completed verification
 
@@ -27,7 +46,7 @@ Updated: 2026-11-08. Free Cloudflare test preview deployed with HTTPS/WSS and pu
 - Added a host-specific coturn configuration template and deployment/verification guide. Local coturn 4.18.0 is installed for disposable loopback tests; no system service is enabled.
 - Actual relay tests pass over UDP and TCP in both engines, including 50 MiB and both cross-engine directions. Selected candidate pairs are verified as relay pairs; WebKit omits relayProtocol, so its sole configured transport is also checked. Both engines also pass the real invalid-credential rejection test without creating a download.
 
-## Next work
+## Earlier next-work list
 
 1. Verify physical Safari/iOS/Android. Local WebKit tests are now green without camera/microphone grants, privacy-disabling flags, or skipped cases; physical devices remain unverified.
 2. Keep [Cloudflare preview](CLOUD.md) on Workers Free. Find a verified zero-charge TURN provider or existing user-controlled relay; do not enable paid overages. Complete WebKit/public-network and trusted TURN TLS tests, then verify two independent networks.

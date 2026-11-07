@@ -9,7 +9,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to content
       </a>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/">
+        <Link className={styles.brand} href="/" prefetch={false}>
           file<span>2</span>file<span className={styles.dot}>.</span>
         </Link>
         <span className={styles.badge}>TEST PREVIEW</span>

@@ -45,7 +45,7 @@ export function parseLink(fragment: string, now = Date.now()): LinkEnvelope {
   if (!fragment || fragment.length > 4096) throw new Error('This link is missing or invalid.');
   const e = object(decode(unbase64url(fragment.replace(/^#/, ''))));
   if (
-    e.v !== 1 ||
+    e.v !== 2 ||
     e.kdf !== KDF_PROFILE ||
     typeof e.id !== 'string' ||
     !ID_PATTERN.test(e.id) ||
@@ -80,7 +80,7 @@ async function wrappingKey(secret: string, pin: string, salt: Bytes) {
   }
 }
 
-const wrapAAD = (id: string, expiry: number) => encode(['file2file', 1, 'wrap', id, expiry]);
+const wrapAAD = (id: string, expiry: number) => encode(['file2file', 2, 'wrap', id, expiry]);
 
 export async function createLink(id: string, expiresAt: number, admission: string, pin: string) {
   const root = randomBytes(32);
@@ -96,7 +96,7 @@ export async function createLink(id: string, expiresAt: number, admission: strin
       payload,
     );
     const envelope: LinkEnvelope = {
-      v: 1,
+      v: 2,
       id,
       expiresAt,
       kdf: KDF_PROFILE,
@@ -146,7 +146,7 @@ export async function deriveTransferKeys(root: Bytes, id: string) {
         name: 'HKDF',
         hash: 'SHA-256',
         salt: encoder.encode(id),
-        info: encoder.encode(`file2file:v1:${direction}`),
+        info: encoder.encode(`file2file:v2:${direction}`),
       },
       material,
       { name: 'AES-GCM', length: 256 },
@@ -165,7 +165,7 @@ function recordParameters(id: string, direction: Direction, sequence: number) {
   return {
     name: 'AES-GCM',
     iv,
-    additionalData: encode(['file2file', 1, id, direction, sequence]),
+    additionalData: encode(['file2file', 2, id, direction, sequence]),
     tagLength: 128,
   };
 }

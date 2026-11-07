@@ -2,12 +2,37 @@
 
 Updated: 2026-11-08. Local and limited live-preview checks, not a production-security certification.
 
-| Command            | Observed result                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run check`    | Passed: formatting, ESLint, strict frontend/service types and documentation links                                                                      |
-| `npm test`         | 22 passed: crypto/protocol, real sockets, temporary TURN credentials, admission and WSS/ICE validation                                                 |
-| `npm run build`    | Passed: static home, receive, five information pages and not-found output                                                                              |
-| `npm run test:e2e` | 22 passed under Node 26.13.0 in 1.8 minutes: 11 Chromium and 11 WebKit, including both cross-engine directions and privacy lifecycle; no skipped cases |
+## Current protocol-v2 verification
+
+Node.js 26.13.0 / npm 11.20.0. The final scheduling change uses an event-driven 3.75 MiB receive window. Unit/service tests: **26 passed**; dependency audit: **zero known vulnerabilities**. The complete local browser suite passed **34/34** in 2.2 minutes with a 512 MiB benchmark per engine. The 512 MiB verified/downloaded-and-hashed times were 25.992/26.889 seconds in Chromium and 18.000/18.846 seconds in WebKit. These local results are not internet-speed guarantees. Formatting, lint, frontend/service/Worker types, documentation links and the static build also passed. A clean rebuild removed stale duplicate generated Next type files; no source typing exception was introduced. Hosting and live deployment results follow below.
+
+The browser suite now covers authenticated future/repeated credit rejection, deliberately slow receiving/decryption, cancellation while sending, and the separate active deadline. Successful cases retain native WebCrypto/WebRTC and verify real downloaded SHA-256. Old v1 links are rejected; create fresh links after updating both tabs.
+
+Before the final event-driven scheduling change, actual streamed fixtures passed:
+
+| Size  | Chromium verified / downloaded and hashed | WebKit verified / downloaded and hashed | Conditions                                                                                                  |
+| ----- | ----------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 2 GiB | 82.454 s / 105.641 s                      | 83.280 s / 104.055 s                    | Private receiver contexts, engines sequential; aggregate sampled browser RSS peaked at 628 MiB              |
+| 4 GiB | 162.319 s / 192.315 s                     | 203.952 s / 228.162 s                   | Normal receiver profiles, engines concurrent; aggregate sampled RSS 1912 MiB                                |
+| 8 GiB | 330.246 s / 408.720 s                     | 504.232 s / 551.650 s                   | Normal receiver profiles; other tests overlapped, so functional evidence, not a clean comparative benchmark |
+
+All rows downloaded the complete file and matched SHA-256. RSS sampling excludes swapped/browser backing data and does not establish mobile support or constant memory. A prior Chromium 4 GiB private-profile download was canceled after verification; normal profiles passed. Browser quota/storage limits are a practical constraint, not an established universal private-mode maximum. The 8 GiB cap is the largest tested value, not a claim that every device can handle it.
+
+Run a bounded regression with `LARGE_TEST_BYTES=536870912 npm run test:e2e`. Run the full-cap benchmark with `npm run test:e2e -- --grep 'large-file benchmark'` (requires sufficient local temporary disk; regular receiver profiles are selected above 2 GiB). Keep these runs sequential, without other browser benchmarks. CI uses 512 MiB to avoid exhausting hosted-runner disk; a CI pass alone does not prove 8 GiB support.
+
+Hosted STUN diagnosis found WebKit did not gather usable server-reflexive candidates from public hostnames, while freshly resolved IPv4 endpoints worked. The bounded DNS fallback passed six actual hosted-runtime transfers (1 MiB+17, both cross-engine directions, slow receivers) before the final scheduling change. Final hosted/relay evidence follows below. No camera/microphone grants, rewritten candidates or privacy-disabling flags are used.
+
+## Final large-file and release checks
+
+The final event-driven implementation passed a real **8 GiB Chromium transfer** with a normal receiver profile: verified receipt in **202.100 seconds**, full download and matching SHA-256 in **252.067 seconds**. WebKit also passed at **253.954 seconds** to verified receipt and **301.588 seconds** through the complete matching download hash. Both engines ran sequentially on the local direct path; the full run passed **2/2** in 9.9 minutes. Sampled aggregate browser RSS peaked at **1137 MiB**, excluding swapped/backing data. Normal desktop receiver profiles were used; these are not physical Safari/mobile measurements. This run is not a controlled comparison to the earlier concurrent benchmarks and does not establish a universal internet rate.
+
+Final cloud build and Worker types passed; **7/7 Worker integration tests** passed. The hosted browser selection passed all six transfer cases (1 MiB+17, cross-engine and deliberately slow receiver in each engine). Chromium information-page checks passed; WebKit exposed an intermittent background RSC-prefetch access-control error during rapid page changes (reproduced twice in three diagnostic runs). Disabling speculative prefetch on the three Next Link entry points removed that error: **3/3 repeated WebKit information-page runs passed**, with the no-page-errors assertion retained. No transfer protocol changes followed the final 8 GiB benchmark.
+
+The final Pages build, its security-header integration test, format/lint/frontend/service/Worker type checks, documentation links and diff-whitespace check all passed before publication. Public relay checks require the deployed Worker secrets and are recorded after deployment.
+
+## Earlier milestone evidence
+
+The sections below record earlier builds in order, including their failures and limitations. Their 50 MiB cap and unresolved hosted WebKit status are historical; use the current protocol-v2 results above and final results below for this update.
 
 ## TURN verification
 

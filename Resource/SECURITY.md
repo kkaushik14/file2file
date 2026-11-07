@@ -19,7 +19,7 @@ Scope: browser UI and lifecycle, link encryption and record validation, Node and
 - Random independent root/URL secrets; authenticated PIN-wrapped envelope; fixed KDF and validated link limits; directional keys and unique record sequence nonces.
 - Manifest, record order, size, completion and receiver acknowledgement checks; opaque download with sanitized filename; no remote content rendering or HTML injection.
 - Exact allowed origins, receiver admission-token hashes, roles, single-receiver claim, expiry, cancellation and disconnect cleanup.
-- Server-only TURN configuration stays outside browser imports. Hosted mode remains STUN-only; no credentials or paid relay were added.
+- Server-only TURN configuration stays outside browser imports. Hosted mode supports owner-approved ExpressTURN Free credentials stored as Worker secrets, explicitly distinguished from temporary coturn credentials. No paid relay was activated.
 - No app analytics, database writes, browser persistence, or file payload logging. Provider network/security processing is separately disclosed.
 - HTTPS/WSS, restrictive CSP with generated hashes, no-referrer, nosniff, disabled camera/microphone/geolocation and no-store HTML.
 
@@ -29,7 +29,7 @@ Short PINs remain guessable offline by a full-link holder; the local attempt cap
 
 Per-IP limits reduce single-source resource exhaustion but do not stop distributed denial of service, spoofed Origin headers from non-browser clients, or exhaustion of the Free account's platform quota. Shared-network users also share limits. Do not enable paid overages. Production release still needs independent review, edge-abuse operations and load/device evidence.
 
-Hosted WebKit/public-STUN connectivity and physical devices on separate networks remain unverified or failing as recorded in TESTS. No new TURN provider was provisioned. Privacy and terms reflect this implementation; jurisdiction-specific legal review and provider-retention/account-policy review remain owner release tasks, not completed legal compliance certification.
+Hosted WebKit discovery and free ExpressTURN configuration are covered by the current follow-up in TESTS. Physical devices on separate networks remain unverified. Privacy and terms reflect this implementation; jurisdiction-specific legal review and provider-retention/account-policy review remain owner release tasks, not completed legal compliance certification.
 
 Monitor the public support mailbox; review provider logs/settings without enabling file/secret logging. Renew security.txt before **8 May 2027**. Recheck dependencies routinely. Cloudflare account-wide API deployment permissions may affect other projects in the same account; restrict any automation token to necessary permissions and this account, keep it only in GitHub Actions secrets, and revoke it if automation is retired. Never commit tokens.
 
@@ -42,3 +42,9 @@ Monitor the public support mailbox; review provider logs/settings without enabli
 - [Cloudflare Direct Upload CI](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/)
 
 Verification results are maintained in [TESTS](TESTS.md); deployment state is recorded in [CLOUD](CLOUD.md).
+
+## Larger-file and hosted relay follow-up
+
+Protocol v2 authenticates receive credit and rejects future/repeated credits, preventing an honest sender from overrunning a slow receiver while preserving the independent 8 MiB inbound limit against hostile peers. Every download still requires exact ordered AES-GCM records and authenticated completion. Old v1 links are rejected; roots/nonces are never reused across versions or sessions. Browser-managed Blob data can be backed by temporary disk; no forensic deletion or constant-memory guarantee is made.
+
+Free ExpressTURN credentials are static: admission limits their delivery but cannot prevent an admitted user from copying/reusing them. Shared quota can be exhausted externally. Rotation is provider-wide, and the active app expiry is not relay credential expiry. The free service lacks TLS/443 and an availability guarantee. Worker secrets and frontend exports must remain separate. DNS discovery only accepts bounded public A records for fixed provider hostnames, respects TTL, does not follow redirects, and falls back to hostname resolution when unavailable.

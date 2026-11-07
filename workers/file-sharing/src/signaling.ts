@@ -4,9 +4,10 @@ import {
   object,
   parseSignal,
   SESSION_TTL_MS,
+  ACTIVE_TRANSFER_TTL_MS,
   TOKEN_PATTERN,
 } from '../../../src/contracts/transfer';
-import type { IceConfiguration } from '../../../src/contracts/ice';
+import { HostedIce, type RelayEnvironment } from './ice';
 import { allowsOrigin } from './origin';
 
 type Session = {
@@ -29,18 +30,16 @@ function equal(left: Uint8Array, right: Uint8Array) {
   for (let i = 0; i < left.length; i++) diff |= left[i] ^ right[i];
   return diff === 0;
 }
-function ice(expiresAt: number): IceConfiguration {
-  return {
-    mode: 'stun',
-    iceTransportPolicy: 'all',
-    expiresAt,
-    iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }],
-  };
-}
 
 // Standard WebSockets intentionally keep this single hub in memory. A restart
 // ends transfers; no socket attachments, SQL, KV, or file data are persisted.
 export class SignalingHub {
+  private ice = new HostedIce();
+
+  constructor(
+    _state: DurableObjectState,
+    private env: RelayEnvironment,
+  ) {}
   private connections = new ConnectionBudget();
   private sessions = new Map<string, Session>();
   private membership = new Map<WebSocket, Session>();
@@ -198,14 +197,27 @@ export class SignalingHub {
         !equal(session.admissionHash, admissionHash)
       )
         throw new Error('Unavailable');
+      const activeExpiry = Date.now() + ACTIVE_TRANSFER_TTL_MS;
+      const ice = await this.ice.configuration(activeExpiry, this.env);
+      // Session timers and socket closure can run while DNS is being resolved.
+      if (
+        socket.readyState !== WebSocket.OPEN ||
+        session.sender.readyState !== WebSocket.OPEN ||
+        this.sessions.get(session.id) !== session ||
+        session.expiresAt <= Date.now()
+      )
+        throw new Error('Unavailable');
+      clearTimeout(session.timer);
+      session.expiresAt = activeExpiry;
+      session.timer = setTimeout(() => this.remove(session, 'expired'), activeExpiry - Date.now());
       session.receiver = socket;
       this.membership.set(socket, session);
       this.send(socket, {
         type: 'joined',
         expiresAt: session.expiresAt,
-        ice: ice(session.expiresAt),
+        ice,
       });
-      this.send(session.sender, { type: 'paired', ice: ice(session.expiresAt) });
+      this.send(session.sender, { type: 'paired', expiresAt: activeExpiry, ice });
     } else if (message.type === 'signal' && existing && existing.expiresAt > Date.now()) {
       const data = parseSignal(message.data);
       const sender = existing.sender === socket;

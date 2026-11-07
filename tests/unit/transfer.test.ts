@@ -31,6 +31,7 @@ test('link roundtrip, wrong PIN, metadata tampering, unsupported KDF and expiry'
   await assert.rejects(unlockLink(parsed, '123457'));
   await assert.rejects(unlockLink({ ...parsed, expiresAt: parsed.expiresAt + 1 }, '123456'));
   assert.throws(() => parseLink(base64url(encode({ ...parsed, kdf: 'PBKDF2-SHA256-1' }))));
+  assert.throws(() => parseLink(base64url(encode({ ...parsed, v: 1 }))));
   assert.throws(() => parseLink(link.fragment, parsed.expiresAt + 1));
   assert.throws(() => parseLink('x'.repeat(4097)));
   unlocked.root.fill(0);

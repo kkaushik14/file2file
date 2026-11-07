@@ -45,8 +45,9 @@ export function SecurityView() {
         </ul>
         <p>
           This is a test preview, not a security certification or independently audited
-          cryptographic product. The hosted service has no TURN relay, and some cross-network and
-          Safari/WebKit transfers remain unsupported.
+          cryptographic product. Free relay availability, restrictive networks and device memory can
+          limit transfers. Physical Safari/iOS/Android and independent-network testing remain
+          separate verification steps.
         </p>
       </section>
       <section>
