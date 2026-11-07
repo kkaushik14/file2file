@@ -1,0 +1,24 @@
+.status {
+  padding: 18px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.status p {
+  margin: 0 0 12px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.status progress {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 8px;
+}
+.status div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: 11px var(--mono);
+  color: var(--muted);
+  margin-top: 8px;
+}

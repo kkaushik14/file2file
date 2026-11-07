@@ -1,0 +1,45 @@
+.note {
+  padding: 28px;
+  background: var(--note);
+  border: 1px solid var(--border);
+  align-self: start;
+}
+.eyebrow {
+  font: 11px var(--mono);
+  letter-spacing: 1.6px;
+  color: var(--muted);
+  margin: 0 0 24px;
+}
+.note h2 {
+  font-size: 25px;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+  margin: 0 0 28px;
+}
+.note ol {
+  padding-left: 21px;
+  margin: 0;
+}
+.note li {
+  padding-left: 7px;
+  margin: 20px 0;
+}
+.note strong {
+  display: block;
+  font-size: 14px;
+}
+.note li span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.disclosure {
+  margin: 26px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}

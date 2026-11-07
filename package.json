@@ -1,0 +1,75 @@
+{
+  "name": "file-sharing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "P2P file sharing web app v1",
+  "keywords": [
+    "file2file"
+  ],
+  "homepage": "https://github.com/kkaushik14/file2file#readme",
+  "bugs": {
+    "url": "https://github.com/kkaushik14/file2file/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkaushik14/file2file.git"
+  },
+  "license": "ISC",
+  "author": "Kumar Kaushik",
+  "type": "module",
+  "engines": {
+    "node": ">=26.13.0 <27",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.20.0",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "next dev --hostname 127.0.0.1 --port 3001",
+    "dev:signal": "node --env-file-if-exists=.env --import tsx services/signaling/src/index.ts",
+    "build": "next build",
+    "preview": "node --env-file-if-exists=.env scripts/preview.mjs",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "next typegen && tsc --noEmit && tsc -p services/signaling/tsconfig.json",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "docs:check": "node scripts/check-docs.mjs",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run docs:check",
+    "test": "node --import tsx --test tests/unit/*.test.ts services/signaling/tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:turn": "node scripts/test-turn.mjs",
+    "build:cloud": "node scripts/build-cloud.mjs",
+    "dev:cloud": "wrangler dev --config workers/file-sharing/wrangler.jsonc --ip 127.0.0.1 --port 8789",
+    "deploy:cloud": "npm run build:cloud && wrangler deploy --config workers/file-sharing/wrangler.jsonc",
+    "typecheck:cloud": "tsc -p workers/file-sharing/tsconfig.json",
+    "test:cloud": "node --test workers/file-sharing/tests/*.test.mjs",
+    "test:e2e:cloud": "playwright test --config playwright.cloud.config.ts",
+    "build:pages": "node scripts/build-cloud.mjs --pages",
+    "test:pages": "node --test tests/hosting/*.test.mjs"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "ws": "8.22.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261107.1",
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/ws": "8.18.2",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.5",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "wrangler": "4.158.0"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  align-items: center;
+}
+.nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 14px;
+  text-underline-offset: 5px;
+}
+.nav a:hover,
+.nav a[aria-current='page'] {
+  color: var(--accent);
+  text-decoration: underline;
+}
+@media (max-width: 600px) {
+  .nav {
+    gap: 0 16px;
+  }
+}

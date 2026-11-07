@@ -1,0 +1,166 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+  gap: 64px;
+  align-items: start;
+}
+.eyebrow {
+  font: 10px var(--mono);
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  margin: 0 0 22px;
+}
+.layout h1 {
+  font-size: clamp(38px, 5vw, 60px);
+  line-height: 1.06;
+  letter-spacing: -2.7px;
+  margin: 0 0 24px;
+  font-weight: 550;
+}
+.layout h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+.intro {
+  color: var(--muted);
+  max-width: 430px;
+  line-height: 1.7;
+  margin-bottom: 32px;
+  font-size: 15px;
+}
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 28px;
+  box-shadow: 0 5px 20px var(--shadow);
+}
+.panelTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.panelTitle h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.panelTitle span {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.form {
+  display: grid;
+  gap: 16px;
+}
+.fileField {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px dashed var(--control-border);
+  border-radius: 4px;
+  padding: 30px 16px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--background);
+}
+.fileField svg {
+  color: var(--accent);
+}
+.fileField strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.fileField span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.fileField input {
+  width: 100%;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.pinLabel {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pinLabel input,
+.linkBox input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--control-border);
+  background: var(--paper);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 12px;
+  font: inherit;
+}
+.help {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: -6px 0 0;
+}
+.linkBox {
+  display: grid;
+  gap: 14px;
+}
+.linkBox label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.linkBox input {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.error {
+  color: var(--error);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+.localNote {
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.success h3 {
+  color: var(--success);
+  margin-top: 0;
+}
+.success p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+@media (max-width: 800px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .layout h1 {
+    font-size: 45px;
+  }
+  .panel {
+    padding: 22px;
+  }
+}
+@media (max-width: 360px) {
+  .panel {
+    padding: 16px;
+  }
+  .layout h1 {
+    font-size: 38px;
+  }
+  .eyebrow {
+    font-size: 9px;
+  }
+}

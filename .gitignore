@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+pages-out/
+*.tsbuildinfo
+.env*
+!.env.example
+test-results/
+playwright-report/
+coverage/
+.DS_Store
+.wrangler/
+workers/file-sharing/generated/
+.dev.vars*

@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+pages-out
+package-lock.json
+next-env.d.ts
+test-results
+playwright-report
+*.tsbuildinfo
+.wrangler
+workers/file-sharing/generated

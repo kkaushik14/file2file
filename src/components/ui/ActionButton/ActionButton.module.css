@@ -1,0 +1,24 @@
+.button {
+  min-height: 46px;
+  padding: 12px 22px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.button:not(:disabled):hover {
+  filter: brightness(0.93);
+}
