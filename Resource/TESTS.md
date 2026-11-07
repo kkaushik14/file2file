@@ -33,7 +33,7 @@ Before this change, WebKit exchanged SDP and mDNS (`.local`) host candidates. Na
 
 The initial Chromium run needed explicit local-network permission. Test contexts grant that permission only to Chromium; normal users may need to accept their browser's prompt. WebKit needs no added permissions in these passing tests. Neither engine uses camera/microphone grants, fake media, candidate rewriting or flags that disable privacy restrictions. End-of-candidates signaling and already-open channel handling remain intact. Safari uses Option/Alt+Tab for links under its default keyboard-navigation preference.
 
-This is evidence for the local discovery fix, not proof of the underlying operating-system mDNS failure or universal Safari support. The bundled Playwright WebKit engine is not the shipping Safari app. Physical Safari/iOS/Android, different networks with maintained STUN/TURN, screen readers/forced colors/zoom, resource and KDF latency profiling at the cap, load/abuse testing, CI automation and independent security review remain release gates. The loopback Binding helper is for same-machine use only. The 50 MiB functional test is not a peak-memory benchmark. Tests cannot prove forensic erasure or make client attempt counters an attacker limit.
+This is evidence for the local discovery fix, not proof of the underlying operating-system mDNS failure or universal Safari support. The bundled Playwright WebKit engine is not the shipping Safari app. Physical Safari/iOS/Android, different networks with maintained STUN/TURN, screen readers/forced colors/zoom, resource and KDF latency profiling at the cap, load/abuse testing and independent security review remain release gates. The loopback Binding helper is for same-machine use only. The 50 MiB functional test is not a peak-memory benchmark. Tests cannot prove forensic erasure or make client attempt counters an attacker limit.
 
 The previous visual check showed the local dark-mode sender in the in-app browser with readable fields and explanatory copy. The TURN change updates explanatory copy to describe optional encrypted relaying; it is not a new physical-mobile or screen-reader audit.
 
@@ -69,4 +69,12 @@ All current checks were run with the official checksum-verified Node.js **26.13.
 - Dependency installation audit: **zero known vulnerabilities**, after the scoped minimatch 11.0.1 override.
 - Browser visual review: local desktop sender and Help page inspected; no layout obstruction observed. The automated mobile checks are not a physical-device or screen-reader audit.
 
-The GitHub deployment workflow runs these checks before production deployment. Its first actual run and live endpoint evidence are recorded separately after execution; local checks alone do not prove automatic deployment is configured. No new hosted WebKit, public TURN, physical-device or two-network success is claimed.
+The GitHub deployment workflow runs these checks before production deployment. Its first actual run and live endpoint evidence are recorded below; local checks alone do not prove automatic deployment is configured. No new hosted WebKit, public TURN, physical-device or two-network success is claimed.
+
+## Deployed verification
+
+[Push-triggered workflow 42416571115](https://github.com/kkaushik14/file2file/actions/runs/42416571115) completed successfully for fc474c9: verify took 2m15s and deploy took 45s, total 3m5s. Node.js 26.13.0 was selected from .nvmrc. Both Worker and Pages deployment steps and the live endpoint smoke check passed.
+
+Post-deploy `CLOUD_TEST_URL=https://file2file-preview.kumarkaushik871.workers.dev npm run test:cloud` passed **5** cases; the saturation case is deliberately skipped on public hosting and passed locally. `CLOUD_TEST_URL=https://share.kkos.in npm run test:e2e:cloud -- --project chromium --grep '1048593 bytes|information pages'` passed **2** cases in 9.4 seconds. This verifies real encryption/WebRTC/download integrity on the custom host and the five public information routes, navigation and mail links. It is one computer/network, not a two-network test.
+
+The browser also displayed the successful workflow and live sender/contact pages. The final documentation-only evidence commit uses GitHub's [skip ci] marker to avoid a redundant deployment of identical application code; later ordinary main pushes still run the workflow.

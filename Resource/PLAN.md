@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated: 2026-11-08. Free Cloudflare test preview deployed with HTTPS/WSS and public STUN; no public TURN subscription. The security/navigation milestone and GitHub deployment automation are being verified.
+Updated: 2026-11-08. Free Cloudflare test preview deployed with HTTPS/WSS and public STUN; no public TURN subscription. The security/navigation milestone and GitHub deployment automation are deployed and verified.
 
 | Phase                   | Status          | Evidence / next gate                                                                                                                                                                                                   |
 | ----------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9,7 +9,7 @@ Updated: 2026-11-08. Free Cloudflare test preview deployed with HTTPS/WSS and pu
 | P2 single-file slice    | Working locally | Sender/link/PIN, memory-only signaling, encrypted WebRTC, validated download, progress, cancellation and cleanup; 0-byte, 1 MiB+17-byte and 50 MiB transfers verified in Chromium and WebKit                           |
 | P3 reliability          | Open            | Configurable STUN/TURN and temporary credentials implemented; UDP/TCP relay paths verified locally. HTTPS/WSS preview deployed; public TURN, WebKit STUN-only operation, separate networks and physical devices remain |
 | P4 larger product scope | Deferred        | Folders, streaming disk output, stored relay and resume                                                                                                                                                                |
-| P5 public release       | Preview only    | Zero-budget test deployment authorized; production security, configured relay, device evidence, CI and operations remain                                                                                               |
+| P5 public release       | Preview only    | Zero-budget test deployment authorized; production security, configured relay, device evidence and operations remain                                                                                                   |
 
 ## Completed verification
 
@@ -31,7 +31,7 @@ Updated: 2026-11-08. Free Cloudflare test preview deployed with HTTPS/WSS and pu
 
 1. Verify physical Safari/iOS/Android. Local WebKit tests are now green without camera/microphone grants, privacy-disabling flags, or skipped cases; physical devices remain unverified.
 2. Keep [Cloudflare preview](CLOUD.md) on Workers Free. Find a verified zero-charge TURN provider or existing user-controlled relay; do not enable paid overages. Complete WebKit/public-network and trusted TURN TLS tests, then verify two independent networks.
-3. Verify GitHub deployment automation and profile mobile KDF/memory usage. Production release remains blocked on the PRD gates; the public URL is a limited test preview.
+3. Profile mobile KDF/memory usage; GitHub deployment automation is verified. Production release remains blocked on the PRD gates; the public URL is a limited test preview.
 
 See [TESTS](TESTS.md) for commands and verification limits. Specifications moved from the repository root into Resource according to the owner's convention; no Portfolio files or secrets were changed/copied.
 
@@ -53,4 +53,10 @@ See [TESTS](TESTS.md) for commands and verification limits. Specifications moved
 
 ## Security and public-information milestone
 
-Implemented the source-review fixes, public information routes, contact mailbox, shared navigation, security.txt, connection admission budgets, browser signaling queue cap and pagehide privacy cleanup. The dependency audit now reports zero known vulnerabilities after a scoped development dependency update. All 22 unit/service tests, 22 browser tests, six Worker tests and the Pages header integration test pass under Node 26.13.0. GitHub deployment credentials are configured; the initial workflow run is the remaining publishing check. See [security review](SECURITY.md).
+Implemented the source-review fixes, public information routes, contact mailbox, shared navigation, security.txt, connection admission budgets, browser signaling queue cap and pagehide privacy cleanup. The dependency audit now reports zero known vulnerabilities after a scoped development dependency update. All 22 unit/service tests, 22 browser tests, six Worker tests and the Pages header integration test pass under Node 26.13.0. GitHub deployment credentials are configured and the first push-triggered workflow succeeded. See [security review](SECURITY.md).
+
+## Published security/navigation milestone
+
+Commit fc474c9 was pushed to main in the owner-confirmed repository. [GitHub Actions run 42416571115](https://github.com/kkaushik14/file2file/actions/runs/42416571115) passed verification and deployed both Cloudflare targets in 3 minutes 5 seconds under Node.js 26.13.0. The public endpoint check passed. Future successful main pushes follow this workflow; no paid service was activated.
+
+The live Worker passed five functional/security integration cases; the connection-cap saturation test is intentionally local-only. On https://share.kkos.in, both targeted Chromium E2E cases passed: all information pages/navigation/contact targets at 320px in both themes, and an actual 1,048,593-byte transfer with matching SHA-256. The browser visually verified the published sender/contact page and owner-confirmed email. Hosted WebKit, physical devices and separate networks remain open.
